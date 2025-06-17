@@ -1,0 +1,19 @@
+repos:
+  # Ruff 快速检查 + 自动修复
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.0                 # 固定 Ruff 版本（建议跟随上游适时升级）
+    hooks:
+      - id: ruff
+        args: ["--fix"]         # 自动修复能修的错误；如想先只报错可去掉
+        stages: [pre-commit]        # 只在 git commit 阶段触发
+
+  # 也可以在此追加黑名单检查、排序导入等其它 hook
+  # 例如：
+  # - repo: https://github.com/asottile/pyupgrade
+  #   rev: v3.17.0
+  #   hooks:
+  #     - id: pyupgrade
+
+  # 执行pre-commit更新 pre-commit autoupdate
+  # 执行所有文件检查  pre-commit run  --all-files
+  # 指定文件检查 pre-commit run ruff --files path/to/file.py

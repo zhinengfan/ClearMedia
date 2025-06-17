@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+wheels/
+
+# Virtual Envs (uv / venv / conda等)
+.venv/
+.venv*/
+env*/
+.uv/
+
+# Environment files
+.env
+.env.*
+
+# Runtime artifacts
+*.db
+*.db-journal*
+*.log
+
+# Docker build leftovers
+backend/__pycache__/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
