@@ -117,7 +117,7 @@ MVP的核心是一个纯后端服务，无Web前端界面，通过Docker运行�
 2.  **`backend/app/core/models.py`:** 实现 `MediaFile` SQLModel 模型，确保`status`字段的枚举值包含`CONFLICT`。
 3.  **`backend/app/db.py`:** 实现 `get_db()` 依赖项函数。
 
-#### **Phase 3: 核心业务逻辑 (强化版)**
+#### **Phase 3: 核心业务逻辑 **
 
 1.  **`backend/app/core/tmdb.py`:**
     *   在模块级别创建 `TMDB_SEMAPHORE = asyncio.Semaphore(10)`。
@@ -140,7 +140,7 @@ MVP的核心是一个纯后端服务，无Web前端界面，通过Docker运行�
     *   **配置Loguru:** 设置日志级别和格式。
     *   使用 `@app.on_event("startup")` 装饰器，在应用启动时，使用 `asyncio.create_task()` 启动后台任务。
 
-#### **Phase 5: Docker化与部署 (强化版)**
+#### **Phase 5: Docker化与部署 **
 
 1.  **`backend/Dockerfile`:**
     *   **第一阶段 (builder):** `COPY pyproject.toml .`, `uv pip sync --system`。
