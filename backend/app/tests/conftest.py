@@ -3,6 +3,7 @@
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -95,3 +96,27 @@ def env_vars():
             os.environ[k] = old_env[k]
         else:
             del os.environ[k] 
+
+
+@pytest.fixture
+def mock_tmdbsimple():
+    """提供模拟的tmdbsimple库"""
+    # 创建一个模拟的Search类
+    mock_search = MagicMock()
+    
+    # 创建一个模拟的Movies类
+    mock_movies = MagicMock()
+    
+    # 创建一个模拟的tmdbsimple模块
+    mock_tmdb = MagicMock()
+    mock_tmdb.Search.return_value = mock_search
+    mock_tmdb.Movies.return_value = mock_movies
+    
+    # 设置API_KEY属性
+    mock_tmdb.API_KEY = None
+    
+    return {
+        "tmdb": mock_tmdb,
+        "search": mock_search,
+        "movies": mock_movies
+    } 

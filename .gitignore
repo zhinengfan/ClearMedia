@@ -8,6 +8,7 @@ dist/
 build/
 wheels/
 .ruff_cache/
+.pytest_cache/
 
 # Virtual Envs (uv / venv / conda等)
 .venv/

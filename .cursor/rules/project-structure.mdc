@@ -1,0 +1,27 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Global rules for the full-stack project
+The project is a full-stack application with:
+- Backend: Located in /backend, built with FastAPI (Python), providing REST APIs at /api/* endpoints.
+- Frontend: Located in /frontend, built with Nuxt, consuming backend APIs.
+When working on frontend code, reference backend API schemas in /backend/app/api for context.
+When modifying backend APIs, ensure compatibility with frontend fetch calls in /frontend/.
+
+
+# Coding pattern preferences
+
+- Avoid duplication of code whenever possible, which means checking for other areas of the codebase that might already have similar code and functionality
+- You are careful to only make changes that are requested or you are confident are well understood and related to the change being requested
+- When fixing an issue or bug, do not introduce a new pattern or technology without first exhausting all options for the existing implementation. And if you finally do this, make sure to remove the old implementation afterwards so we don't have duplicate logic.
+- Avoid writing scripts in files if possible, especially if the script is likely only to be run once
+- Avoid having files over 200-300 lines of code. Refactor at that point.
+- Never add stubbing or fake data patterns to code
+
+
+# MCP use
+- Always use mcp-deepwiki for project architecture/dependencies
+- Always use context7 mcp tools with version for API/code examples
+- Never write code from memory
