@@ -119,4 +119,79 @@ def mock_tmdbsimple():
         "tmdb": mock_tmdb,
         "search": mock_search,
         "movies": mock_movies
-    } 
+    }
+
+
+@pytest.fixture
+def mock_openai_client():
+    """提供模拟的OpenAI异步客户端"""
+    from unittest.mock import AsyncMock
+    
+    # 创建模拟的OpenAI客户端
+    mock_client = AsyncMock()
+    
+    # 模拟chat.completions.create方法
+    mock_client.chat.completions.create = AsyncMock()
+    
+    return mock_client
+
+
+@pytest.fixture
+def mock_openai_response():
+    """提供标准的模拟OpenAI响应"""
+    def _create_response(content_dict):
+        """创建模拟响应的工厂函数"""
+        import json
+        
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = json.dumps(content_dict)
+        
+        return mock_response
+    
+    return _create_response
+
+
+@pytest.fixture
+def sample_movie_response():
+    """提供标准的电影分析响应数据"""
+    return {
+        "title": "Sample Movie",
+        "year": "2023",
+        "type": "movie"
+    }
+
+
+@pytest.fixture
+def sample_tv_response():
+    """提供标准的电视剧分析响应数据"""
+    return {
+        "title": "Sample TV Show",
+        "year": "2023",
+        "type": "tv",
+        "season": 1,
+        "episode": 1
+    }
+
+
+@pytest.fixture(autouse=True)
+def clear_llm_cache():
+    """自动清除LLM函数缓存的fixture"""
+    # 在每个测试开始前清除缓存
+    try:
+        from app.core import llm
+        if hasattr(llm.analyze_filename, 'cache_clear'):
+            llm.analyze_filename.cache_clear()
+    except ImportError:
+        # 如果llm模块还不存在，忽略
+        pass
+    
+    yield
+    
+    # 测试结束后也清除缓存（可选）
+    try:
+        from app.core import llm
+        if hasattr(llm.analyze_filename, 'cache_clear'):
+            llm.analyze_filename.cache_clear()
+    except ImportError:
+        pass 
