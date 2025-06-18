@@ -1,26 +1,24 @@
-import asyncio
-from pprint import pprint
 
 # -------------- 导入我们要测试的封装 ---------------------------
-from backend.app.core import tmdb as tmdb_core    # 为避免同名冲突取别名
+# from backend.app.core import tmdb as tmdb_core    # 为避免同名冲突取别名
 
-# -------------- 写一个异步 main 函数 --------------------------
-async def main():
-    # ① 先搜索。标题、年份都可改成你想试的任何内容
-    movie = await tmdb_core.search_movie(
-        {"title": "未闻花名"}
-    )
-    pprint(movie)  # 直接打印 movie 对象，不需要额外的字符串前缀
+# # -------------- 写一个异步 main 函数 --------------------------
+# async def main():
+#     # ① 先搜索。标题、年份都可改成你想试的任何内容
+#     movie = await tmdb_core.search_movie(
+#         {"title": "未闻花名"}
+#     )
+#     pprint(movie)  # 直接打印 movie 对象，不需要额外的字符串前缀
 
-    if movie:
-        # ② 再拿详情
-        details = await tmdb_core.get_movie_details(movie["id"])
-        print("Details title:", details["title"])
-        print("Overview:", details["overview"][:150], "...")
-        print("Runtime:", details["runtime"], "minutes")
+#     if movie:
+#         # ② 再拿详情
+#         details = await tmdb_core.get_movie_details(movie["id"])
+#         print("Details title:", details["title"])
+#         print("Overview:", details["overview"][:150], "...")
+#         print("Runtime:", details["runtime"], "minutes")
 
-# -------------- 直接跑 --------------------------
-asyncio.run(main())
+# # -------------- 直接跑 --------------------------
+# asyncio.run(main())
 
 
 
@@ -31,3 +29,13 @@ asyncio.run(main())
 #     pprint(result)
 
 # asyncio.run(main())
+
+from pathlib import Path
+from backend.app.core.linker import create_hardlink, LinkResult
+
+source = Path("/home/zz/media_sim/[云光字幕组] mono女孩  Mono [01][简体双语][1080p]招募翻译.mp4")
+target = Path("/home/zz/media_test/mono女孩- 01.mp4")
+result = create_hardlink(source, target)
+
+if result == LinkResult.LINK_SUCCESS:
+    print("硬链接创建成功")
