@@ -68,6 +68,10 @@ class Settings(BaseSettings):
         ge=60,  # 最小1分钟
         le=3600  # 最大1小时
     )
+    VIDEO_EXTENSIONS: str = Field(
+        default=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v",
+        description="允许处理的媒体文件扩展名，逗号分隔格式"
+    )
 
     # —— 运行环境 & 日志 ——
     LOG_LEVEL: LogLevel = Field(
@@ -116,6 +120,34 @@ class Settings(BaseSettings):
         if not v.replace("-", "").isalnum():
             raise ValueError("无效的语言代码格式")
         return v
+
+    @field_validator("VIDEO_EXTENSIONS")
+    @classmethod
+    def validate_video_extensions(cls, v: str) -> str:
+        """验证视频扩展名格式"""
+        if not v:
+            raise ValueError("视频扩展名不能为空")
+        
+        # 分割扩展名
+        extensions = [ext.strip() for ext in v.split(',') if ext.strip()]
+        
+        if not extensions:
+            raise ValueError("视频扩展名列表不能为空")
+        
+        validated_extensions = []
+        for extension in extensions:
+            if not extension.startswith('.'):
+                raise ValueError(f"扩展名必须以'.'开头: {extension}")
+            # 简化验证：只检查基本格式，允许字母、数字和常见字符
+            ext_body = extension[1:]  # 去掉点号
+            if not ext_body:
+                raise ValueError(f"扩展名不能只有点号: {extension}")
+            # 允许字母、数字、以及常见的视频格式字符（如m4v中的数字）
+            if not all(c.isalnum() for c in ext_body):
+                raise ValueError(f"扩展名只能包含字母和数字: {extension}")
+            validated_extensions.append(extension.lower())
+        
+        return ','.join(validated_extensions)
 
 
 # 全局单例

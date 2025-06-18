@@ -2,6 +2,11 @@ import datetime
 from typing import Optional
 from sqlmodel import Field, SQLModel, JSON, Column
 
+
+def utc_now() -> datetime.datetime:
+    """获取当前UTC时间，用于数据库时间戳"""
+    return datetime.datetime.now(datetime.timezone.utc)
+
 # 定义文件状态的枚举值，便于管理和引用
 class FileStatus:
     PENDING = "PENDING"
@@ -16,8 +21,8 @@ class MediaFile(SQLModel, table=True):
     """
     # 基础信息
     id: Optional[int] = Field(default=None, primary_key=True)
-    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow, nullable=False)
-    updated_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow, nullable=False, sa_column_kwargs={"onupdate": datetime.datetime.utcnow})
+    created_at: datetime.datetime = Field(default_factory=utc_now, nullable=False)
+    updated_at: datetime.datetime = Field(default_factory=utc_now, nullable=False, sa_column_kwargs={"onupdate": utc_now})
 
     # --------------------------------------------------------------------------
     # 文件唯一标识 (关键字段，用于去重)
