@@ -1,7 +1,7 @@
 """LLM交互模块 (llm.py)
 使用 openai 客户端进行文件名分析
 """
-
+import re
 import json
 import asyncio
 from typing import Dict, Union
@@ -18,6 +18,7 @@ from openai import (
     RateLimitError,
 )
 from loguru import logger
+from ..config import settings as _settings
 
 # 缓存OpenAI客户端实例
 _openai_client = None
@@ -26,7 +27,10 @@ def get_openai_client() -> AsyncOpenAI:
     """获取或创建OpenAI客户端实例"""
     global _openai_client
     if _openai_client is None:
-        _openai_client = AsyncOpenAI()
+        _openai_client = AsyncOpenAI(
+            api_key=_settings.OPENAI_API_KEY,
+            base_url=_settings.OPENAI_API_BASE,
+        )
     return _openai_client
 
 # 创建一个简单的异步缓存装饰器
@@ -141,17 +145,23 @@ async def analyze_filename(filename: str) -> Dict[str, Union[str, int, None]]:
     # 获取OpenAI客户端
     client = get_openai_client()
     
+    # 构造请求参数
+    request_params = {
+        "model": _settings.OPENAI_MODEL,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": 0.1,  # 降低随机性，保持输出一致性
+    }
+
+    # 仅当使用官方 OpenAI 端点时才使用 response_format，避免兼容层报错
+    if "api.openai" in _settings.OPENAI_API_BASE:
+        request_params["response_format"] = {"type": "json_object"}
+
     # 调用API
     try:
-        response = await client.chat.completions.create(
-            model="gpt-4",  # 使用最新可用的GPT-4模型
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.1,  # 降低随机性，保持输出一致性
-            response_format={"type": "json_object"},  # 强制JSON输出
-        )
+        response = await client.chat.completions.create(**request_params)
         
         # 验证响应
         if not response.choices:
@@ -167,7 +177,20 @@ async def analyze_filename(filename: str) -> Dict[str, Union[str, int, None]]:
             raise ValueError("LLM返回了空响应")
             
         # 解析JSON
-        result = json.loads(response.choices[0].message.content)
+        raw_content = response.choices[0].message.content.strip()
+
+        # 先尝试只取最后一个 JSON 对象（兼容 <think> ... \n{json}）
+        last_brace = raw_content.rfind("{")
+        if last_brace != -1:
+            try:
+                result = json.loads(raw_content[last_brace:])
+                return result
+            except json.JSONDecodeError:
+                pass
+        json_match = re.search(r"\{[\s\S]*\}$", raw_content)
+        if not json_match:
+            raise
+        result = json.loads(json_match.group())
         
         # 验证必填字段
         if not result.get("title"):

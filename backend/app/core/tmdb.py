@@ -3,9 +3,14 @@ from loguru import logger
 import tmdbsimple
 import requests
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from ..config import settings as _settings
 
-# 创建信号量限制并发请求数
-TMDB_SEMAPHORE = asyncio.Semaphore(10)
+# 依据配置更新并发限制 & API Key
+TMDB_SEMAPHORE = asyncio.Semaphore(_settings.TMDB_CONCURRENCY)
+tmdbsimple.API_KEY = _settings.TMDB_API_KEY
+# 如果有语言需求
+if hasattr(tmdbsimple, 'DEFAULT_LANGUAGE'):
+    tmdbsimple.DEFAULT_LANGUAGE = _settings.TMDB_LANGUAGE
 
 # 重试装饰器配置
 retry_config = {
