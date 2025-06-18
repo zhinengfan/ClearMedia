@@ -3,6 +3,8 @@ from loguru import logger
 import tmdbsimple
 import requests
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from async_lru import alru_cache
+from typing import Optional, Dict, Any
 from ..config import settings as _settings
 
 # 依据配置更新并发限制 & API Key
@@ -25,28 +27,24 @@ retry_config = {
 }
 
 
+@alru_cache(maxsize=128)
 @retry(**retry_config)
-async def search_movie(llm_data):
+async def search_movie_by_title_and_year(title: str, year: Optional[int] = None) -> Optional[Dict[str, Any]]:
     """
-    搜索电影信息
+    根据标题和年份搜索电影信息
     
     Args:
-        llm_data (dict): 包含电影信息的字典，必须包含title，可选包含year
+        title (str): 电影标题
+        year (Optional[int]): 发行年份，可选
     
     Returns:
-        dict: 找到的电影信息，如果未找到则返回None
+        Optional[Dict[str, Any]]: 找到的电影信息，如果未找到则返回None
     """
+    # 日志记录缓存未命中，便于调试
+    logger.info(f"TMDB Cache Miss: Calling TMDB API for search_movie: title='{title}', year={year}")
+    
     async with TMDB_SEMAPHORE:
         try:
-            title = llm_data.get("title")
-            year = None
-            
-            if "year" in llm_data and llm_data["year"]:
-                try:
-                    year = int(llm_data["year"])
-                except (ValueError, TypeError):
-                    logger.warning(f"无效的年份格式: {llm_data['year']}")
-            
             # 使用asyncio.to_thread包装同步操作
             search = tmdbsimple.Search()
             
@@ -60,6 +58,7 @@ async def search_movie(llm_data):
             _ = await asyncio.to_thread(_search_movie)
             
             if search.results:
+                logger.info(f"成功搜索电影: {title} ({year if year else '无年份'}) -> {search.results[0].get('title', 'N/A')}")
                 return search.results[0]
             
             logger.info(f"未找到电影: {title} ({year if year else '无年份'})")
@@ -70,8 +69,33 @@ async def search_movie(llm_data):
             raise
 
 
+async def search_movie(llm_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """
+    搜索电影信息 - 兼容性包装函数
+    
+    Args:
+        llm_data (Dict[str, Any]): 包含电影信息的字典，必须包含title，可选包含year
+    
+    Returns:
+        Optional[Dict[str, Any]]: 找到的电影信息，如果未找到则返回None
+    """
+    title = llm_data.get("title")
+    if not title:
+        raise ValueError("llm_data必须包含title字段")
+    
+    year = None
+    if "year" in llm_data and llm_data["year"]:
+        try:
+            year = int(llm_data["year"])
+        except (ValueError, TypeError):
+            logger.warning(f"无效的年份格式: {llm_data['year']}")
+    
+    return await search_movie_by_title_and_year(title, year)
+
+
+@alru_cache(maxsize=256)
 @retry(**retry_config)
-async def get_movie_details(movie_id):
+async def get_movie_details(movie_id: int) -> Dict[str, Any]:
     """
     获取电影详细信息
     
@@ -79,8 +103,11 @@ async def get_movie_details(movie_id):
         movie_id (int): TMDB电影ID
     
     Returns:
-        dict: 电影详细信息
+        Dict[str, Any]: 电影详细信息
     """
+    # 日志记录缓存未命中，便于调试
+    logger.info(f"TMDB Cache Miss: Calling TMDB API for get_movie_details: movie_id={movie_id}")
+    
     async with TMDB_SEMAPHORE:
         try:
             # 使用asyncio.to_thread包装同步操作
@@ -92,6 +119,7 @@ async def get_movie_details(movie_id):
             
             movie_info = await asyncio.to_thread(_get_movie_info)
 
+            logger.info(f"成功获取电影详情: movie_id={movie_id} -> {movie_info.get('title', 'N/A')}")
             return movie_info
             
         except Exception as e:

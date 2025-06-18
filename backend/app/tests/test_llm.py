@@ -703,7 +703,7 @@ class TestLLMEdgeCasesAndBoundaryConditions:
         测试用例 5.4: 处理OpenAI响应结构异常
         Given: OpenAI返回结构异常的响应
         When: 调用分析函数
-        Then: 函数应该能处理各种响应结构异常
+        Then: 函数应该能优雅地处理各种响应结构异常，抛出适当的错误
         """
         # 测试不同的异常响应结构
         malformed_responses = [
@@ -734,7 +734,7 @@ class TestLLMEdgeCasesAndBoundaryConditions:
                 # 如果函数返回结果，验证其合理性
                 if result is not None:
                     assert isinstance(result, dict)
-            except (AttributeError, TypeError, IndexError):
+            except (ValueError, AttributeError, TypeError, IndexError):
                 # 如果函数抛出这些异常，这是可以理解的
                 pass
 

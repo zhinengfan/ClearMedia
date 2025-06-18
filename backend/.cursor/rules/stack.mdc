@@ -1,7 +1,7 @@
 ---
 description: 
-globs: *.py
-alwaysApply: false
+globs: 
+alwaysApply: true
 ---
 #技术栈
 
@@ -12,7 +12,7 @@ alwaysApply: false
 | **配置管理** | **`pydantic-settings`** |
 | **数据库 ORM** | **SQLite + SQLModel** |
 | **API 交互** | **`openai`, `tmdbsimple`** |
-| **可靠性** | **`tenacity` (重试), `asyncio.Semaphore` (限速), `functools.lru_cache` (缓存), `asyncio.to_thread` (异步包装)** |
+| **可靠性** | **`tenacity` (重试), `asyncio.Semaphore` (限速), `async-lru` (缓存), `asyncio.to_thread` (异步包装)** |
 | **日志** | **`loguru`** |
 | **部署** | **Docker + Docker Compose** |
 | **环境/包管理** | **`uv`** |

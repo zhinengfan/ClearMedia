@@ -11,6 +11,7 @@ from tenacity import (
     wait_exponential,
     retry_if_exception_type,
 )
+from async_lru import alru_cache
 from openai import (
     AsyncOpenAI,
     APIError,
@@ -33,60 +34,7 @@ def get_openai_client() -> AsyncOpenAI:
         )
     return _openai_client
 
-# 创建一个简单的异步缓存装饰器
-_cache = {}
-_cache_stats = {'hits': 0, 'misses': 0, 'maxsize': 128, 'currsize': 0}
-
-def async_lru_cache(maxsize: int = 128):
-    """异步LRU缓存装饰器"""
-    def decorator(func):
-        cache = {}
-        cache_info = {'hits': 0, 'misses': 0, 'maxsize': maxsize, 'currsize': 0}
-        
-        async def wrapper(*args, **kwargs):
-            # 创建缓存键
-            key = str(args) + str(sorted(kwargs.items()))
-            
-            if key in cache:
-                cache_info['hits'] += 1
-                return cache[key]
-            
-            # 如果缓存已满，删除最老的条目（简单FIFO，不是真正的LRU）
-            if len(cache) >= maxsize:
-                oldest_key = next(iter(cache))
-                del cache[oldest_key]
-                cache_info['currsize'] -= 1
-            
-            # 调用原函数并缓存结果
-            try:
-                result = await func(*args, **kwargs)
-                cache[key] = result
-                cache_info['misses'] += 1
-                cache_info['currsize'] += 1
-                return result
-            except Exception as e:
-                # 不缓存异常结果
-                raise e
-        
-        # 添加缓存管理方法
-        def cache_clear():
-            cache.clear()
-            cache_info['hits'] = 0
-            cache_info['misses'] = 0
-            cache_info['currsize'] = 0
-        
-        def cache_info_func():
-            from collections import namedtuple
-            CacheInfo = namedtuple('CacheInfo', ['hits', 'misses', 'maxsize', 'currsize'])
-            return CacheInfo(**cache_info)
-        
-        wrapper.cache_clear = cache_clear
-        wrapper.cache_info = cache_info_func
-        wrapper.__wrapped__ = func
-        
-        return wrapper
-    return decorator
-
+@alru_cache(maxsize=128)
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=1, max=10),
@@ -98,7 +46,6 @@ def async_lru_cache(maxsize: int = 128):
         retry_if_exception_type(asyncio.TimeoutError)
     ),
 )
-@async_lru_cache(maxsize=128)
 async def analyze_filename(filename: str) -> Dict[str, Union[str, int, None]]:
     """
     使用LLM分析文件名，提取标题、年份和类型等信息
@@ -118,6 +65,9 @@ async def analyze_filename(filename: str) -> Dict[str, Union[str, int, None]]:
         ValueError: 当文件名为空或仅包含空白字符时
         json.JSONDecodeError: 当LLM返回的不是有效JSON时
     """
+    # 日志记录缓存未命中，便于调试
+    logger.info(f"LLM Cache Miss: Calling LLM API for filename: '{filename}'")
+
     # 输入验证
     if not filename or not filename.strip():
         raise ValueError("文件名不能为空")
@@ -152,11 +102,11 @@ async def analyze_filename(filename: str) -> Dict[str, Union[str, int, None]]:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        "temperature": 0.1,  # 降低随机性，保持输出一致性
+        "temperature": 0.1,
     }
 
-    # 仅当使用官方 OpenAI 端点时才使用 response_format，避免兼容层报错
-    if "api.openai" in _settings.OPENAI_API_BASE:
+    # 仅当使用官方 OpenAI 端点时才使用 response_format
+    if "api.openai.com" in _settings.OPENAI_API_BASE:
         request_params["response_format"] = {"type": "json_object"}
 
     # 调用API
@@ -164,50 +114,49 @@ async def analyze_filename(filename: str) -> Dict[str, Union[str, int, None]]:
         response = await client.chat.completions.create(**request_params)
         
         # 验证响应
-        if not response.choices:
-            raise AttributeError("响应中缺少choices字段")
-        
-        if not response.choices[0].message:
-            raise AttributeError("响应中缺少message字段")
+        if not response.choices or not response.choices[0].message or response.choices[0].message.content is None:
+            raise ValueError("LLM返回了无效的响应结构")
             
-        if response.choices[0].message.content is None:
-            raise AttributeError("响应中缺少content字段")
-            
-        if response.choices[0].message.content == "":
+        raw_content = response.choices[0].message.content.strip()
+        if not raw_content:
             raise ValueError("LLM返回了空响应")
             
-        # 解析JSON
-        raw_content = response.choices[0].message.content.strip()
-
-        # 先尝试只取最后一个 JSON 对象（兼容 <think> ... \n{json}）
-        last_brace = raw_content.rfind("{")
-        if last_brace != -1:
-            try:
-                result = json.loads(raw_content[last_brace:])
-                return result
-            except json.JSONDecodeError:
-                pass
-        json_match = re.search(r"\{[\s\S]*\}$", raw_content)
-        if not json_match:
-            raise
-        result = json.loads(json_match.group())
+        # 优化了JSON解析逻辑
+        # 很多模型会在JSON前后添加```json ... ```标记，先移除它们
+        if raw_content.startswith("```json"):
+            raw_content = raw_content[7:]
+        if raw_content.endswith("```"):
+            raw_content = raw_content[:-3]
+        
+        # 移除 <think>...</think> 标签包围的内容
+        think_pattern = r'<think>.*?</think>\s*'
+        raw_content = re.sub(think_pattern, '', raw_content, flags=re.DOTALL)
+        
+        # 找到第一个 { 和最后一个 }，提取它们之间的内容
+        first_brace = raw_content.find("{")
+        last_brace = raw_content.rfind("}")
+        if first_brace == -1 or last_brace == -1:
+            raise json.JSONDecodeError("在LLM响应中未找到JSON对象", raw_content, 0)
+        
+        json_string = raw_content[first_brace : last_brace + 1].strip()
+        result = json.loads(json_string)
         
         # 验证必填字段
         if not result.get("title"):
             raise ValueError("LLM返回的结果缺少title字段")
             
-        if "type" not in result:
-            result["type"] = "movie"  # 默认为电影类型
+        if "type" not in result or result["type"] not in ["movie", "tv"]:
+            result["type"] = "movie"  # 如果type无效或不存在，默认为电影类型
         
-        logger.info(f"成功分析文件名: {filename} -> {result}")
+        logger.info(f"成功分析文件名: '{filename}' -> {result}")
         return result
         
     except json.JSONDecodeError as e:
-        logger.error(f"LLM返回的不是有效JSON: {filename}, 错误: {e}")
+        logger.error(f"LLM返回的不是有效JSON: '{filename}', 响应内容: '{raw_content}', 错误: {e}")
         raise
     except (APIError, APITimeoutError, RateLimitError) as e:
-        logger.warning(f"OpenAI API错误，将重试: {filename}, 错误: {e}")
+        logger.warning(f"OpenAI API错误，将重试: '{filename}', 错误: {e}")
         raise
     except Exception as e:
-        logger.error(f"分析文件名时发生未知错误: {filename}, 错误: {e}")
+        logger.error(f"分析文件名时发生未知错误: '{filename}', 错误类型: {type(e).__name__}, 错误: {e}")
         raise 

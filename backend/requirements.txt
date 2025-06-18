@@ -8,6 +8,8 @@ anyio==4.9.0
     #   openai
     #   starlette
     #   watchfiles
+async-lru==2.0.5
+    # via backend
 certifi==2025.6.15
     # via
     #   httpcore
