@@ -63,10 +63,20 @@ class Settings(BaseSettings):
     SOURCE_DIR: Path = Field(..., description="待扫描的源文件夹路径")
     TARGET_DIR: Path = Field(..., description="整理后的目标文件夹路径")
     SCAN_INTERVAL_SECONDS: int = Field(
-        300,
-        description="扫描间隔（秒）",
-        ge=60,  # 最小1分钟
-        le=3600  # 最大1小时
+        default=300,
+        description="扫描器两次扫描之间的等待时间（秒）"
+    )
+    SCAN_EXCLUDE_TARGET_DIR: bool = Field(
+        default=True,
+        description="扫描时是否自动排除目标目录"
+    )
+    SCAN_FOLLOW_SYMLINKS: bool = Field(
+        default=False,
+        description="扫描时是否跟随符号链接（软链接），开启可能导致循环扫描"
+    )
+    MIN_FILE_SIZE_MB: int = Field(
+        default=10,
+        description="扫描时忽略小于此大小的文件（MB），0表示不限制"
     )
     VIDEO_EXTENSIONS: str = Field(
         default=".mp4,.mkv,.avi,.mov,.wmv,.flv,.webm,.m4v",
@@ -81,6 +91,24 @@ class Settings(BaseSettings):
     APP_ENV: AppEnv = Field(
         AppEnv.DEV,
         description="运行环境: development/production"
+    )
+
+    # —— 功能开关 ——
+    ENABLE_TMDB: bool = Field(
+        default=True,
+        description="是否启用TMDB API调用"
+    )
+    ENABLE_LLM: bool = Field(
+        default=True,
+        description="是否启用LLM分析功能"
+    )
+    
+    # —— 队列与工作者 ——
+    WORKER_COUNT: int = Field(
+        default=2,
+        description="处理媒体文件的工作者协程数量",
+        ge=1,
+        le=10
     )
 
     model_config = SettingsConfigDict(
@@ -155,22 +183,10 @@ _settings: Settings | None = None
 
 
 def get_settings() -> Settings:
-    """获取配置单例，支持热重载。
-
-    Returns:
-        Settings: 全局配置实例
-    """
+    """返回全局配置单例，如果不存在则创建。"""
     global _settings
-
-    # 首次加载或热重载
     if _settings is None:
         _settings = Settings()
-    else:
-        # 检查.env文件是否有变化并重载
-        env_file = Path(".env")
-        if env_file.exists():
-            _settings.__init__()
-
     return _settings
 
 

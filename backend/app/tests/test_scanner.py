@@ -6,6 +6,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from ..config import settings
 
 
 class TestScanDirectoryOnce:
@@ -24,6 +25,11 @@ class TestScanDirectoryOnce:
         test_video = source_dir / "test_movie.mp4"
         fs.create_file(test_video, contents="fake video content")
         
+        # 模拟settings
+        mocker.patch.object(settings, 'SOURCE_DIR', source_dir)
+        mocker.patch.object(settings, 'TARGET_DIR', Path("/test/target"))
+        mocker.patch.object(settings, 'MIN_FILE_SIZE_MB', 0)
+
         # 模拟CRUD函数
         mock_get_media_file = mocker.patch('app.crud.get_media_file_by_inode_device')
         mock_create_media_file = mocker.patch('app.crud.create_media_file')
@@ -41,7 +47,7 @@ class TestScanDirectoryOnce:
         from ..scanner import scan_directory_once
         
         # 执行扫描
-        scan_directory_once(mock_db_session, source_dir, allowed_extensions)
+        scan_directory_once(mock_db_session, settings, allowed_extensions)
         
         # 验证CRUD函数调用
         mock_get_media_file.assert_called_once()
@@ -60,6 +66,11 @@ class TestScanDirectoryOnce:
         test_video = source_dir / "existing_movie.mp4"
         fs.create_file(test_video, contents="fake video content")
         
+        # 模拟settings
+        mocker.patch.object(settings, 'SOURCE_DIR', source_dir)
+        mocker.patch.object(settings, 'TARGET_DIR', Path("/test/target"))
+        mocker.patch.object(settings, 'MIN_FILE_SIZE_MB', 0)
+
         # 模拟CRUD函数
         mock_get_media_file = mocker.patch('app.crud.get_media_file_by_inode_device')
         mock_create_media_file = mocker.patch('app.crud.create_media_file')
@@ -80,7 +91,7 @@ class TestScanDirectoryOnce:
         from ..scanner import scan_directory_once
         
         # 执行扫描
-        scan_directory_once(mock_db_session, source_dir, allowed_extensions)
+        scan_directory_once(mock_db_session, settings, allowed_extensions)
         
         # 验证CRUD函数调用
         mock_get_media_file.assert_called_once()
@@ -103,6 +114,11 @@ class TestScanDirectoryOnce:
         fs.create_file(text_file, contents="some text")
         fs.create_file(image_file, contents="fake image")
         
+        # 模拟settings
+        mocker.patch.object(settings, 'SOURCE_DIR', source_dir)
+        mocker.patch.object(settings, 'TARGET_DIR', Path("/test/target"))
+        mocker.patch.object(settings, 'MIN_FILE_SIZE_MB', 0)
+
         # 模拟CRUD函数
         mock_get_media_file = mocker.patch('app.crud.get_media_file_by_inode_device')
         mock_create_media_file = mocker.patch('app.crud.create_media_file')
@@ -117,7 +133,7 @@ class TestScanDirectoryOnce:
         from ..scanner import scan_directory_once
         
         # 执行扫描
-        scan_directory_once(mock_db_session, source_dir, allowed_extensions)
+        scan_directory_once(mock_db_session, settings, allowed_extensions)
         
         # 验证CRUD函数都没有被调用
         mock_get_media_file.assert_not_called()
@@ -133,6 +149,11 @@ class TestScanDirectoryOnce:
         source_dir = Path("/test/empty_source")
         fs.create_dir(source_dir)
         
+        # 模拟settings
+        mocker.patch.object(settings, 'SOURCE_DIR', source_dir)
+        mocker.patch.object(settings, 'TARGET_DIR', Path("/test/target"))
+        mocker.patch.object(settings, 'MIN_FILE_SIZE_MB', 0)
+
         # 模拟CRUD函数
         mock_get_media_file = mocker.patch('app.crud.get_media_file_by_inode_device')
         mock_create_media_file = mocker.patch('app.crud.create_media_file')
@@ -147,7 +168,7 @@ class TestScanDirectoryOnce:
         from ..scanner import scan_directory_once
         
         # 执行扫描
-        scan_directory_once(mock_db_session, source_dir, allowed_extensions)
+        scan_directory_once(mock_db_session, settings, allowed_extensions)
         
         # 验证CRUD函数都没有被调用
         mock_get_media_file.assert_not_called()
@@ -175,6 +196,11 @@ class TestScanDirectoryOnce:
         fs.create_file(another_video, contents="another video")
         fs.create_file(image_file, contents="image content")
         
+        # 模拟settings
+        mocker.patch.object(settings, 'SOURCE_DIR', source_dir)
+        mocker.patch.object(settings, 'TARGET_DIR', Path("/test/target"))
+        mocker.patch.object(settings, 'MIN_FILE_SIZE_MB', 0)
+
         # 模拟CRUD函数
         mock_get_media_file = mocker.patch('app.crud.get_media_file_by_inode_device')
         mock_create_media_file = mocker.patch('app.crud.create_media_file')
@@ -192,7 +218,7 @@ class TestScanDirectoryOnce:
         from ..scanner import scan_directory_once
         
         # 执行扫描
-        scan_directory_once(mock_db_session, source_dir, allowed_extensions)
+        scan_directory_once(mock_db_session, settings, allowed_extensions)
         
         # 验证CRUD函数调用次数
         # 应该为2个视频文件各调用一次get_media_file_by_inode_device

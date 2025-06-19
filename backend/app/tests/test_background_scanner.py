@@ -99,8 +99,8 @@ class TestBackgroundScannerTask:
         # 验证调用参数正确
         for call in mock_scan.call_args_list:
             args, kwargs = call
-            assert len(args) == 3  # db_session, source_dir, allowed_extensions
-            assert args[1] == mock_settings.SOURCE_DIR  # source_dir
+            assert len(args) == 3  # db_session, settings, allowed_extensions
+            assert args[1] == mock_settings  # settings object
             assert isinstance(args[2], set)  # allowed_extensions
     
     @pytest.mark.asyncio

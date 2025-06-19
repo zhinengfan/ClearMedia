@@ -1,5 +1,6 @@
 from sqlmodel import create_engine, Session, SQLModel
-from app.config import settings
+from .config import settings
+from typing import Callable
 
 # 数据库文件路径
 DATABASE_URL = settings.DATABASE_URL
@@ -22,3 +23,17 @@ def get_db():
     """
     with Session(engine) as session:
         yield session 
+
+# ---------------------------------------------------------------------------
+#   通用会话工厂函数 (后台任务 / 单元测试 / 脚本均可复用)
+# ---------------------------------------------------------------------------
+
+def get_session_factory() -> Callable[[], Session]:
+    """返回一个调用即得 `Session` 的工厂函数。
+
+    与 FastAPI 依赖 `get_db()` 的区别：
+    - `get_db()` 返回生成器，用于 `Depends`
+    - 本函数直接返回 `lambda: Session(engine)`，方便普通函数或后台协程使用
+    """
+
+    return lambda: Session(engine) 
