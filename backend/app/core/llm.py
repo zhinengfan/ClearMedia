@@ -73,22 +73,25 @@ async def analyze_filename(filename: str) -> Dict[str, Union[str, int, None]]:
         raise ValueError("文件名不能为空")
         
     # 准备系统提示和用户提示
-    system_prompt = """你是一个专业的文件名分析助手。你的任务是从电影或电视剧文件名中提取关键信息。
-请将分析结果以JSON格式返回，包含以下字段:
-- title: 影视作品标题(必填)
-- year: 发行年份(如果能识别)
-- type: 类型，使用'movie'表示电影，'tv'表示电视剧
-- season: 季数(仅电视剧)
-- episode: 集数(仅电视剧)
+    system_prompt = """你是一个专业的媒体文件名分析助手。从影视文件名提取信息，输出JSON包含：title(必填), year(可选), type(必填), season/episode(仅电视剧),
+**核心规则：**
+1. 清洗干扰项：移除分辨率/编码/版本标识(v2等)/扩展名，特殊字符转空格
+2. 标题：取最长文字部分，清除尾随数字（如"沙尘暴07"→"沙尘暴"）
+3. 类型检测：
+   - 有季集标识(S/E/季/集)或结尾≥2位孤立数字 → `"tv"`
+   - 否则 → `"movie"`
+4. 季集处理：
+   - 无明确季 → season=1
+   - 结尾数字 → episode（如"07v2"→7）
+5. 年份：仅提取1900-2099的4位数
 
-示例输出:
-{
-    "title": "Breaking Bad",
-    "year": 2008,
-    "type": "tv",
-    "season": 1,
-    "episode": 1
-}"""
+**输出示例：**
+{"title": "Breaking Bad", "type": "tv", "season": 1, "episode": 7}
+
+**严格约束：**
+- 电视剧必含season/episode
+- 电影禁止出现season/episode
+- 无年份时省略year字段"""
 
     user_prompt = f"请分析这个文件名: {filename}"
     

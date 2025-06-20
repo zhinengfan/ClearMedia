@@ -5,8 +5,6 @@ from loguru import logger
 from app.config import settings
 
 import asyncio
-
-
 from app.db import create_db_and_tables, get_session_factory
 from app.processor import process_media_file
 from app.scanner import background_scanner_task

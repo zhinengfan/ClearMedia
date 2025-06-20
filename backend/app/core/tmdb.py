@@ -58,7 +58,7 @@ async def search_movie_by_title_and_year(title: str, year: Optional[int] = None)
             _ = await asyncio.to_thread(_search_movie)
             
             if search.results:
-                logger.info(f"成功搜索电影: {title} ({year if year else '无年份'}) -> {search.results[0].get('title', 'N/A')}")
+                logger.info(f"成功搜索电影: {title} ({year if year else '无年份'}) -> {search.results[0].get('title', 'N/A')} ({search.results[0].get('release_date')[:4] if search.results[0].get('release_date') else 'N/A'})")
                 return search.results[0]
             
             logger.info(f"未找到电影: {title} ({year if year else '无年份'})")
@@ -158,7 +158,7 @@ async def search_tv_by_title_and_year(title: str, year: Optional[int] = None) ->
             _ = await asyncio.to_thread(_search_tv)
             
             if search.results:
-                logger.info(f"成功搜索电视剧: {title} ({year if year else '无年份'}) -> {search.results[0].get('name', 'N/A')}")
+                logger.info(f"成功搜索电视剧: {title} ({year if year else '无年份'}) -> {search.results[0].get('name', 'N/A')} ({search.results[0].get('first_air_date')[:4] if search.results[0].get('first_air_date') else 'N/A'})")
                 return search.results[0]
             
             logger.info(f"未找到电视剧: {title} ({year if year else '无年份'})")
