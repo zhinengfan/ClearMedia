@@ -111,8 +111,14 @@ class Settings(BaseSettings):
         le=10
     )
 
+    # —— CORS 跨域配置 ——
+    CORS_ORIGINS: str = Field(
+        default="*",
+        description="允许跨域访问的源地址，逗号分隔格式，如: http://localhost:3000,https://example.com"
+    )
+
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", ".env.local"),
         env_file_encoding="utf-8",
         env_prefix="",  # 不统一前缀，保持与.env变量一致
         case_sensitive=True,
@@ -176,6 +182,36 @@ class Settings(BaseSettings):
             validated_extensions.append(extension.lower())
         
         return ','.join(validated_extensions)
+
+    @field_validator("CORS_ORIGINS")
+    @classmethod
+    def validate_cors_origins(cls, v: str) -> str:
+        """验证CORS源地址格式"""
+        if not v:
+            raise ValueError("CORS源地址不能为空")
+        
+        # 如果是通配符，直接返回
+        if v.strip() == "*":
+            return "*"
+        
+        # 分割源地址
+        origins = [origin.strip() for origin in v.split(',') if origin.strip()]
+        
+        if not origins:
+            raise ValueError("CORS源地址列表不能为空")
+        
+        validated_origins = []
+        for origin in origins:
+            # 基本URL格式验证
+            if origin != "*" and not (origin.startswith("http://") or origin.startswith("https://")):
+                raise ValueError(f"CORS源地址必须以http://或https://开头，或使用通配符*: {origin}")
+            validated_origins.append(origin)
+        
+        return ','.join(validated_origins)
+
+    def get_cors_origins_list(self) -> list[str]:
+        """获取CORS_ORIGINS的列表形式"""
+        return self.CORS_ORIGINS.split(',')
 
 
 # 全局单例

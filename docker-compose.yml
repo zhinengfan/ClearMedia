@@ -1,0 +1,18 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - ./.env
+    ports:
+      - "8000:8000"
+    volumes:
+      # 媒体源目录挂载
+      - ./media_source:/data/source
+      # 媒体目标目录挂载
+      - ./media_target:/data/target
+      # 数据库目录挂载
+      - ./data:/data/db
+    restart: unless-stopped
+    container_name: clearmedia-backend 

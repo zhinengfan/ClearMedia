@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from loguru import logger
@@ -95,6 +96,15 @@ async def lifespan(app: FastAPI):
     logger.info("所有后台任务已关闭")
 
 app = FastAPI(title="ClearMedia API", lifespan=lifespan)
+
+# 添加 CORS 中间件
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.get_cors_origins_list(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 引入API路由
 app.include_router(api_router)
