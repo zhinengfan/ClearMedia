@@ -178,6 +178,24 @@ async def process_media_file(
                 ctx_logger.info(f"TMDB 搜索成功: ID={tmdb_result['tmdb_id']}, 类型={tmdb_result['media_type']}")
             else:
                 ctx_logger.warning("TMDB 搜索未找到匹配结果")
+                # 当TMDB启用但未找到匹配时，设置为NO_MATCH状态
+                with db_session_factory() as db:
+                    media_file = db.get(MediaFile, media_file_id)
+                    if media_file:
+                        if llm_result:
+                            media_file.llm_guess = llm_result
+                        media_file.status = FileStatus.NO_MATCH
+                        media_file.error_message = "No TMDB match found"
+                        db.add(media_file)
+                        db.commit()
+                
+                # 设置最终状态为NO_MATCH，防止finally块覆盖
+                final_status = FileStatus.NO_MATCH
+                return ProcessResult(
+                    success=False,
+                    message="No TMDB match found",
+                    media_file_id=media_file_id
+                )
         else:
             if not settings.ENABLE_TMDB:
                 ctx_logger.info("TMDB 功能已禁用，跳过媒体搜索")

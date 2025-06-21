@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from loguru import logger
 from app.config import settings
+from app.api import router as api_router
 
 import asyncio
 from app.db import create_db_and_tables, get_session_factory
@@ -29,6 +30,10 @@ async def lifespan(app: FastAPI):
     create_db_and_tables()
     logger.info("数据库和表初始化完成")
     db_session_factory = get_session_factory()
+    
+    # 将队列保存到app.state中，供API路由访问
+    app.state.media_queue = media_file_queue
+    logger.info("队列已保存到app.state.media_queue")
     
     async def worker() -> None:
         """工作者协程，从队列中获取媒体文件ID并处理"""
@@ -90,6 +95,9 @@ async def lifespan(app: FastAPI):
     logger.info("所有后台任务已关闭")
 
 app = FastAPI(title="ClearMedia API", lifespan=lifespan)
+
+# 引入API路由
+app.include_router(api_router)
 
 @app.get("/")
 def read_root():

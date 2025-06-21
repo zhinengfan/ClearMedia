@@ -194,4 +194,69 @@ def clear_llm_cache():
         if hasattr(llm.analyze_filename, 'cache_clear'):
             llm.analyze_filename.cache_clear()
     except ImportError:
-        pass 
+        pass
+
+
+# 新的测试配置环境变量 fixture，替代依赖 .env 文件的做法
+# 该 fixture 会在测试执行期间设置一组完整的环境变量，
+# 并在测试结束后恢复原有环境，确保测试隔离且不修改生产代码。
+
+
+
+@pytest.fixture
+def test_config_env():
+    """设置测试配置环境变量的fixture（推荐方案）。
+
+    - 创建临时目录作为 SOURCE_DIR / TARGET_DIR
+    - 设置应用运行所需的全部环境变量
+    - yield 后恢复环境变量
+    """
+    # 创建临时工作目录
+    temp_dir = Path(tempfile.mkdtemp())
+    source_dir = temp_dir / "source"
+    target_dir = temp_dir / "target"
+    source_dir.mkdir()
+    target_dir.mkdir()
+
+    # 备份现有可能被覆盖的环境变量
+    backup_env: dict[str, str] = {}
+
+    def _set_env(key: str, value: str):
+        if key in os.environ:
+            backup_env[key] = os.environ[key]
+        os.environ[key] = value
+
+    # 准备测试所需的环境变量
+    test_env = {
+        "DATABASE_URL": f"sqlite:///{temp_dir}/test.db",
+        "SQLITE_ECHO": "false",
+        "OPENAI_API_KEY": "sk-test-key",
+        "OPENAI_API_BASE": "https://api.openai.com/v1",
+        "OPENAI_MODEL": "gpt-4-turbo-preview",
+        "TMDB_API_KEY": "tmdb-test-key",
+        "TMDB_LANGUAGE": "zh-CN",
+        "TMDB_CONCURRENCY": "5",
+        "SOURCE_DIR": str(source_dir),
+        "TARGET_DIR": str(target_dir),
+        "SCAN_INTERVAL_SECONDS": "60",
+        "LOG_LEVEL": "DEBUG",
+        "APP_ENV": "development",
+    }
+
+    # 设置环境变量
+    for k, v in test_env.items():
+        _set_env(k, v)
+
+    yield {
+        "temp_dir": temp_dir,
+        "source_dir": source_dir,
+        "target_dir": target_dir,
+        "env": test_env,
+    }
+
+    # 恢复环境变量
+    for k in test_env:
+        if k in backup_env:
+            os.environ[k] = backup_env[k]
+        else:
+            os.environ.pop(k, None) 

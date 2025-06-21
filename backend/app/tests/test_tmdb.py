@@ -292,4 +292,123 @@ async def test_tmdb_semaphore_limit(mocker):
     
     # 验证并发限制
     assert max_concurrent <= 10, f"并发请求数超过了限制：{max_concurrent} > 10"
-    assert acquire_count == 15, "应该有15个请求尝试获取信号量" 
+    assert acquire_count == 15, "应该有15个请求尝试获取信号量"
+
+
+@pytest.mark.asyncio
+async def test_search_media_hybrid_search_success(mocker):
+    """
+    测试TMDB混合搜索功能：LLM错误识别类型时的备用搜索
+    Given: LLM错误地将一个电影识别为TV剧类型
+    When: 调用search_media函数
+    Then: 主类型搜索失败后，自动尝试备用类型并成功找到匹配
+    """
+    # 模拟LLM错误识别：将《Inception》(电影)识别为TV剧
+    llm_data = {
+        "title": "Inception",
+        "year": 2010,
+        "type": "tv"  # 错误的类型识别
+    }
+    
+    # 模拟TV剧搜索失败（返回None）
+    mock_search_tv = mocker.patch("app.core.tmdb.search_tv_by_title_and_year")
+    mock_search_tv.return_value = None
+    
+    # 模拟电影搜索成功
+    mock_search_movie = mocker.patch("app.core.tmdb.search_movie_by_title_and_year")
+    mock_search_movie.return_value = {
+        "id": 27205,
+        "title": "Inception",
+        "release_date": "2010-07-16",
+        "overview": "A thief who steals corporate secrets...",
+        "vote_average": 8.4
+    }
+    
+    # 调用被测函数
+    result = await tmdb.search_media(llm_data)
+    
+    # 验证结果
+    assert result is not None
+    assert result["tmdb_id"] == 27205
+    assert result["media_type"] == "movie"  # 最终确定的正确类型
+    assert result["processed_data"]["title"] == "Inception"
+    
+    # 验证调用顺序：先尝试TV剧，失败后尝试电影
+    mock_search_tv.assert_called_once_with("Inception", 2010)
+    mock_search_movie.assert_called_once_with("Inception", 2010)
+
+
+@pytest.mark.asyncio 
+async def test_search_media_hybrid_search_both_fail(mocker):
+    """
+    测试TMDB混合搜索功能：主类型和备用类型都搜索失败
+    Given: 一个在TMDB中不存在的媒体标题
+    When: 调用search_media函数
+    Then: 主类型和备用类型搜索都失败，最终返回None
+    """
+    # 模拟一个不存在的媒体
+    llm_data = {
+        "title": "Non-existent Movie",
+        "year": 1999,
+        "type": "movie"
+    }
+    
+    # 模拟电影搜索失败
+    mock_search_movie = mocker.patch("app.core.tmdb.search_movie_by_title_and_year")
+    mock_search_movie.return_value = None
+    
+    # 模拟TV剧搜索也失败
+    mock_search_tv = mocker.patch("app.core.tmdb.search_tv_by_title_and_year") 
+    mock_search_tv.return_value = None
+    
+    # 调用被测函数
+    result = await tmdb.search_media(llm_data)
+    
+    # 验证结果
+    assert result is None
+    
+    # 验证调用顺序：先尝试电影（主类型），失败后尝试TV剧（备用类型）
+    mock_search_movie.assert_called_once_with("Non-existent Movie", 1999)
+    mock_search_tv.assert_called_once_with("Non-existent Movie", 1999)
+
+
+@pytest.mark.asyncio
+async def test_search_media_primary_type_success(mocker):
+    """
+    测试TMDB混合搜索功能：主类型搜索成功的情况
+    Given: LLM正确识别了媒体类型
+    When: 调用search_media函数
+    Then: 主类型搜索成功，不需要尝试备用类型
+    """
+    # 模拟LLM正确识别的电影
+    llm_data = {
+        "title": "The Matrix",
+        "year": 1999,
+        "type": "movie"
+    }
+    
+    # 模拟电影搜索成功
+    mock_search_movie = mocker.patch("app.core.tmdb.search_movie_by_title_and_year")
+    mock_search_movie.return_value = {
+        "id": 603,
+        "title": "The Matrix",
+        "release_date": "1999-03-30",
+        "overview": "Set in the 22nd century...",
+        "vote_average": 8.7
+    }
+    
+    # 模拟TV剧搜索（不应被调用）
+    mock_search_tv = mocker.patch("app.core.tmdb.search_tv_by_title_and_year")
+    
+    # 调用被测函数
+    result = await tmdb.search_media(llm_data)
+    
+    # 验证结果
+    assert result is not None
+    assert result["tmdb_id"] == 603
+    assert result["media_type"] == "movie"
+    assert result["processed_data"]["title"] == "The Matrix"
+    
+    # 验证只调用了电影搜索，没有调用TV剧搜索
+    mock_search_movie.assert_called_once_with("The Matrix", 1999)
+    mock_search_tv.assert_not_called() 

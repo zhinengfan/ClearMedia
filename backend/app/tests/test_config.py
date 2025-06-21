@@ -9,33 +9,35 @@ import pytest
 from pydantic import ValidationError
 
 
-def test_settings_from_env_file(temp_env_file):
-    """测试用例 1.1: 成功加载配置
-    
-    Given: 一个包含所有必需变量的有效.env文件
-    When: Settings类被实例化
-    Then: settings对象的属性值与.env文件中的值完全匹配
+def test_settings_from_env(test_config_env):
+    """测试用例 1.1: 成功加载配置（环境变量隔离）
+
+    Given: 一组完整且有效的环境变量
+    When: Settings 类被实例化
+    Then: 配置字段与环境变量保持一致
     """
+
     from app import config as cfg
 
-    # 确保重新加载配置模块，以便使用temp_env_file所创建的.env
+    # 重新加载配置模块，确保读取最新环境变量
     importlib.reload(cfg)
+
     settings = cfg.Settings()
-    
+
     # 基础配置
     assert settings.DATABASE_URL.endswith("/test.db")
     assert settings.SQLITE_ECHO is False
-    
-    # API配置
+
+    # API 配置
     assert settings.OPENAI_API_KEY == "sk-test-key"
     assert settings.OPENAI_MODEL == "gpt-4-turbo-preview"
     assert settings.TMDB_API_KEY == "tmdb-test-key"
-    
+
     # 目录配置
-    assert settings.SOURCE_DIR == temp_env_file["source_dir"].resolve()
-    assert settings.TARGET_DIR == temp_env_file["target_dir"].resolve()
+    assert settings.SOURCE_DIR == test_config_env["source_dir"].resolve()
+    assert settings.TARGET_DIR == test_config_env["target_dir"].resolve()
     assert settings.SCAN_INTERVAL_SECONDS == 60
-    
+
     # 环境配置
     assert settings.LOG_LEVEL == cfg.LogLevel.DEBUG
     assert settings.APP_ENV == cfg.AppEnv.DEV

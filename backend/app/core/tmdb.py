@@ -172,6 +172,7 @@ async def search_tv_by_title_and_year(title: str, year: Optional[int] = None) ->
 async def search_media(llm_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     根据 LLM 分析结果搜索媒体信息（电影或电视剧）
+    实现混合搜索：如果基于LLM类型猜测的首次搜索失败，自动尝试另一种媒体类型
     
     Args:
         llm_data (Dict[str, Any]): LLM 分析的结果，包含 title, type, year 等字段
@@ -183,7 +184,7 @@ async def search_media(llm_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if not title:
         raise ValueError("llm_data必须包含title字段")
     
-    media_type = llm_data.get("type", "movie")
+    primary_type = llm_data.get("type", "movie")
     year = None
     if "year" in llm_data and llm_data["year"]:
         try:
@@ -192,9 +193,13 @@ async def search_media(llm_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             logger.warning(f"无效的年份格式: {llm_data['year']}")
     
     try:
-        if media_type == "tv":
+        # 第一步：尝试LLM推荐的类型
+        logger.info(f"开始TMDB搜索: {title} (主类型: {primary_type})")
+        
+        if primary_type == "tv":
             result = await search_tv_by_title_and_year(title, year)
             if result:
+                logger.info(f"主类型搜索成功: {title} -> TV剧")
                 return {
                     "tmdb_id": result["id"],
                     "media_type": "tv",
@@ -203,15 +208,39 @@ async def search_media(llm_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         else:  # movie or fallback
             result = await search_movie_by_title_and_year(title, year)
             if result:
+                logger.info(f"主类型搜索成功: {title} -> 电影")
                 return {
                     "tmdb_id": result["id"],
                     "media_type": "movie", 
                     "processed_data": result
                 }
         
-        logger.warning(f"未在TMDB中找到匹配的媒体: {title} ({media_type})")
+        # 第二步：主类型搜索失败，尝试备用类型
+        backup_type = "movie" if primary_type == "tv" else "tv"
+        logger.info(f"主类型({primary_type})搜索失败，尝试备用类型: {backup_type}")
+        
+        if backup_type == "tv":
+            result = await search_tv_by_title_and_year(title, year)
+            if result:
+                logger.info(f"备用类型搜索成功: {title} -> TV剧 (原猜测: {primary_type})")
+                return {
+                    "tmdb_id": result["id"],
+                    "media_type": "tv",
+                    "processed_data": result
+                }
+        else:  # backup_type == "movie"
+            result = await search_movie_by_title_and_year(title, year)
+            if result:
+                logger.info(f"备用类型搜索成功: {title} -> 电影 (原猜测: {primary_type})")
+                return {
+                    "tmdb_id": result["id"],
+                    "media_type": "movie", 
+                    "processed_data": result
+                }
+        
+        logger.warning(f"混合搜索完毕，未在TMDB中找到匹配的媒体: {title} (尝试了 {primary_type} 和 {backup_type})")
         return None
         
     except Exception as e:
-        logger.error(f"搜索媒体时出错: {title} ({media_type}) - {str(e)}")
+        logger.error(f"搜索媒体时出错: {title} ({primary_type}) - {str(e)}")
         raise 

@@ -14,6 +14,7 @@ class FileStatus:
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
     CONFLICT = "CONFLICT"
+    NO_MATCH = "NO_MATCH"
 
 class MediaFile(SQLModel, table=True):
     """
@@ -42,7 +43,7 @@ class MediaFile(SQLModel, table=True):
         default=FileStatus.PENDING, 
         index=True, 
         nullable=False,
-        description=f"文件当前处理状态: {FileStatus.PENDING}, {FileStatus.PROCESSING}, {FileStatus.COMPLETED}, {FileStatus.FAILED}, {FileStatus.CONFLICT}"
+        description=f"文件当前处理状态: {FileStatus.PENDING}, {FileStatus.PROCESSING}, {FileStatus.COMPLETED}, {FileStatus.FAILED}, {FileStatus.CONFLICT}, {FileStatus.NO_MATCH}"
     )
     
     # --------------------------------------------------------------------------

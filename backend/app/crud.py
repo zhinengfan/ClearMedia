@@ -34,6 +34,40 @@ def get_media_file_by_inode_device(
     return db.exec(statement).first()
 
 
+def get_media_file_by_id(db: Session, file_id: int) -> Optional[MediaFile]:
+    """
+    根据ID查询MediaFile记录。
+    
+    Args:
+        db: 数据库会话
+        file_id: 媒体文件的ID
+        
+    Returns:
+        Optional[MediaFile]: 匹配的MediaFile记录，如果不存在则返回None
+    """
+    statement = select(MediaFile).where(MediaFile.id == file_id)
+    return db.exec(statement).first()
+
+
+def update_media_file_status(db: Session, media_file: MediaFile, new_status: str) -> MediaFile:
+    """
+    更新MediaFile的状态。
+    
+    Args:
+        db: 数据库会话
+        media_file: 要更新的MediaFile实例
+        new_status: 新的状态值
+        
+    Returns:
+        MediaFile: 更新后的MediaFile记录
+    """
+    media_file.status = new_status
+    db.add(media_file)
+    db.commit()
+    db.refresh(media_file)
+    return media_file
+
+
 def create_media_file(db: Session, file_path: Path) -> MediaFile:
     """
     创建新的MediaFile记录。
