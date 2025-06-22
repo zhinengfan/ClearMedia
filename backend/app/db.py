@@ -16,6 +16,20 @@ def create_db_and_tables():
     """
     SQLModel.metadata.create_all(engine)
 
+    # ------------------------------------------------------------------
+    # 确保关键索引存在 (idempotent)
+    # ------------------------------------------------------------------
+    # 注意：SQLite 对表达式索引支持良好，可直接在 lower(original_filename) 上建索引
+
+    index_statements = [
+        # 对文件名做大小写不敏感索引，加速模糊搜索
+        "CREATE INDEX IF NOT EXISTS idx_media_name_ci ON mediafile (lower(original_filename))"
+    ]
+
+    with engine.begin() as conn:
+        for stmt in index_statements:
+            conn.exec_driver_sql(stmt)
+
 def get_db():
     """
     一个FastAPI依赖项，用于提供数据库会话。

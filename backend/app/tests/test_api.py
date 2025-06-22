@@ -232,6 +232,355 @@ class TestMediaFilesAPI:
                 next_time = items[i + 1]["created_at"]
                 assert current_time >= next_time
 
+    def test_get_files_search_by_filename(self, client: TestClient, sample_media_files):
+        """测试按文件名搜索"""
+        response = client.get("/api/files?search=movie")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 2  # movie1.mp4 和 movie2.mkv
+        assert len(data["items"]) == 2
+        
+        # 验证搜索结果包含关键词
+        for item in data["items"]:
+            assert "movie" in item["original_filename"].lower()
+    
+    def test_get_files_search_by_filepath(self, client: TestClient, sample_media_files):
+        """测试按文件路径搜索"""
+        response = client.get("/api/files?search=/test/")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 5  # 所有文件都在/test/目录下
+        assert len(data["items"]) == 5
+    
+    def test_get_files_search_case_insensitive(self, client: TestClient, sample_media_files):
+        """测试搜索大小写不敏感"""
+        response = client.get("/api/files?search=MOVIE")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 2  # 应该找到movie1.mp4和movie2.mkv
+        assert len(data["items"]) == 2
+    
+    def test_get_files_search_no_results(self, client: TestClient, sample_media_files):
+        """测试搜索无结果"""
+        response = client.get("/api/files?search=nonexistent")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 0
+        assert len(data["items"]) == 0
+    
+    def test_get_files_search_empty_string(self, client: TestClient, sample_media_files):
+        """测试空字符串搜索"""
+        response = client.get("/api/files?search=")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 5  # 空搜索应该返回所有结果
+        assert len(data["items"]) == 5
+    
+    def test_get_files_search_whitespace_only(self, client: TestClient, sample_media_files):
+        """测试只包含空格的搜索"""
+        response = client.get("/api/files?search=   ")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 5  # 只有空格的搜索应该返回所有结果
+        assert len(data["items"]) == 5
+    
+    def test_get_files_sort_created_at_asc(self, client: TestClient, sample_media_files):
+        """测试按创建时间升序排序"""
+        response = client.get("/api/files?sort=created_at:asc")
+        assert response.status_code == 200
+        
+        data = response.json()
+        items = data["items"]
+        
+        # 验证时间戳是升序的（最早的在前）
+        if len(items) > 1:
+            for i in range(len(items) - 1):
+                current_time = items[i]["created_at"]
+                next_time = items[i + 1]["created_at"]
+                assert current_time <= next_time
+    
+    def test_get_files_sort_created_at_desc(self, client: TestClient, sample_media_files):
+        """测试按创建时间降序排序（默认行为）"""
+        response = client.get("/api/files?sort=created_at:desc")
+        assert response.status_code == 200
+        
+        data = response.json()
+        items = data["items"]
+        
+        # 验证时间戳是降序的（最新的在前）
+        if len(items) > 1:
+            for i in range(len(items) - 1):
+                current_time = items[i]["created_at"]
+                next_time = items[i + 1]["created_at"]
+                assert current_time >= next_time
+    
+    def test_get_files_sort_default_behavior(self, client: TestClient, sample_media_files):
+        """测试默认排序行为（不指定sort参数）"""
+        response = client.get("/api/files")
+        assert response.status_code == 200
+        
+        data = response.json()
+        items = data["items"]
+        
+        # 默认应该是降序
+        if len(items) > 1:
+            for i in range(len(items) - 1):
+                current_time = items[i]["created_at"]
+                next_time = items[i + 1]["created_at"]
+                assert current_time >= next_time
+    
+    def test_get_files_invalid_sort_parameter(self, client: TestClient, sample_media_files):
+        """测试无效的排序参数"""
+        response = client.get("/api/files?sort=invalid_sort")
+        assert response.status_code == 422
+    
+    def test_get_files_search_and_status_filter(self, client: TestClient, sample_media_files):
+        """测试搜索和状态筛选组合"""
+        response = client.get(f"/api/files?search=movie&status={FileStatus.PENDING}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 1  # 只有movie1.mp4是PENDING状态
+        assert len(data["items"]) == 1
+        assert data["items"][0]["status"] == FileStatus.PENDING
+        assert "movie" in data["items"][0]["original_filename"].lower()
+    
+    def test_get_files_search_status_and_sort(self, client: TestClient, sample_media_files):
+        """测试搜索、状态筛选和排序的组合"""
+        response = client.get(f"/api/files?search=movie&status={FileStatus.COMPLETED}&sort=created_at:asc")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 1  # 只有movie2.mkv是COMPLETED状态
+        assert len(data["items"]) == 1
+        assert data["items"][0]["status"] == FileStatus.COMPLETED
+        assert "movie" in data["items"][0]["original_filename"].lower()
+    
+    def test_get_files_all_parameters_combined(self, client: TestClient, sample_media_files):
+        """测试所有参数组合使用"""
+        response = client.get("/api/files?search=movie&sort=created_at:asc&skip=0&limit=10")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 2  # movie1.mp4 和 movie2.mkv
+        assert data["skip"] == 0
+        assert data["limit"] == 10
+        assert len(data["items"]) == 2
+        
+        # 验证排序
+        items = data["items"]
+        if len(items) > 1:
+            for i in range(len(items) - 1):
+                current_time = items[i]["created_at"]
+                next_time = items[i + 1]["created_at"]
+                assert current_time <= next_time
+
+
+class TestMediaFileDetailAPI:
+    """测试媒体文件详情API端点"""
+    
+    def test_get_media_file_success(self, client: TestClient, sample_media_files):
+        """测试成功获取存在的媒体文件详情"""
+        # 使用第一个测试文件
+        test_file = sample_media_files[0]
+        
+        response = client.get(f"/api/files/{test_file.id}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["id"] == test_file.id
+        assert data["original_filename"] == test_file.original_filename
+        assert data["original_filepath"] == test_file.original_filepath
+        assert data["file_size"] == test_file.file_size
+        assert data["status"] == test_file.status
+        assert data["inode"] == test_file.inode
+        assert data["device_id"] == test_file.device_id
+        assert "created_at" in data
+        assert "updated_at" in data
+    
+    def test_get_media_file_not_found(self, client: TestClient, sample_media_files):
+        """测试获取不存在的媒体文件，应返回404"""
+        response = client.get("/api/files/99999")
+        assert response.status_code == 404
+        
+        data = response.json()
+        assert "媒体文件不存在" in data["detail"]
+        assert "ID=99999" in data["detail"]
+    
+    def test_get_media_file_invalid_id_type(self, client: TestClient, sample_media_files):
+        """测试使用无效的文件ID类型（非整数）"""
+        response = client.get("/api/files/invalid_id")
+        assert response.status_code == 422
+    
+    def test_get_media_file_negative_id(self, client: TestClient, sample_media_files):
+        """测试使用负数作为文件ID"""
+        response = client.get("/api/files/-1")
+        assert response.status_code == 404
+        
+        data = response.json()
+        assert "媒体文件不存在" in data["detail"]
+        assert "ID=-1" in data["detail"]
+    
+    def test_get_media_file_zero_id(self, client: TestClient, sample_media_files):
+        """测试使用0作为文件ID"""
+        response = client.get("/api/files/0")
+        assert response.status_code == 404
+        
+        data = response.json()
+        assert "媒体文件不存在" in data["detail"]
+        assert "ID=0" in data["detail"]
+    
+    def test_get_media_file_different_statuses(self, client: TestClient, sample_media_files):
+        """测试获取不同状态的媒体文件详情"""
+        # 测试每种状态的文件
+        status_files = {
+            FileStatus.PENDING: next(f for f in sample_media_files if f.status == FileStatus.PENDING),
+            FileStatus.COMPLETED: next(f for f in sample_media_files if f.status == FileStatus.COMPLETED),
+            FileStatus.FAILED: next(f for f in sample_media_files if f.status == FileStatus.FAILED),
+            FileStatus.NO_MATCH: next(f for f in sample_media_files if f.status == FileStatus.NO_MATCH),
+            FileStatus.PROCESSING: next(f for f in sample_media_files if f.status == FileStatus.PROCESSING),
+        }
+        
+        for status, file_obj in status_files.items():
+            response = client.get(f"/api/files/{file_obj.id}")
+            assert response.status_code == 200
+            
+            data = response.json()
+            assert data["id"] == file_obj.id
+            assert data["status"] == status
+
+
+class TestSuggestAPI:
+    """测试文件名建议API端点"""
+    
+    def test_suggest_filenames_success(self, client: TestClient, sample_media_files):
+        """测试成功获取文件名建议"""
+        response = client.get("/api/files/suggest?keyword=movie")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert "suggestions" in data
+        assert isinstance(data["suggestions"], list)
+        assert len(data["suggestions"]) == 2  # movie1.mp4 和 movie2.mkv
+        
+        # 验证建议都以关键字开头
+        for suggestion in data["suggestions"]:
+            assert suggestion.lower().startswith("movie")
+    
+    def test_suggest_filenames_case_insensitive(self, client: TestClient, sample_media_files):
+        """测试大小写不敏感的建议"""
+        response = client.get("/api/files/suggest?keyword=MOVIE")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert len(data["suggestions"]) == 2
+        
+        # 验证建议都包含movie（不区分大小写）
+        for suggestion in data["suggestions"]:
+            assert "movie" in suggestion.lower()
+    
+    def test_suggest_filenames_single_character(self, client: TestClient, sample_media_files):
+        """测试单字符前缀建议"""
+        response = client.get("/api/files/suggest?keyword=m")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert len(data["suggestions"]) == 2  # movie1.mp4 和 movie2.mkv
+    
+    def test_suggest_filenames_no_matches(self, client: TestClient, sample_media_files):
+        """测试无匹配结果"""
+        response = client.get("/api/files/suggest?keyword=nonexistent")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["suggestions"] == []
+    
+    def test_suggest_filenames_empty_keyword(self, client: TestClient, sample_media_files):
+        """测试空关键字"""
+        response = client.get("/api/files/suggest?keyword=")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["suggestions"] == []
+    
+    def test_suggest_filenames_whitespace_keyword(self, client: TestClient, sample_media_files):
+        """测试只包含空格的关键字"""
+        response = client.get("/api/files/suggest?keyword=   ")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["suggestions"] == []
+    
+    def test_suggest_filenames_with_limit(self, client: TestClient, sample_media_files):
+        """测试限制返回数量"""
+        response = client.get("/api/files/suggest?keyword=movie&limit=1")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert len(data["suggestions"]) == 1
+    
+    def test_suggest_filenames_limit_zero(self, client: TestClient, sample_media_files):
+        """测试limit为0（应该返回422错误）"""
+        response = client.get("/api/files/suggest?keyword=movie&limit=0")
+        assert response.status_code == 422
+    
+    def test_suggest_filenames_limit_too_large(self, client: TestClient, sample_media_files):
+        """测试limit超过最大值（应该返回422错误）"""
+        response = client.get("/api/files/suggest?keyword=movie&limit=101")
+        assert response.status_code == 422
+    
+    def test_suggest_filenames_missing_keyword(self, client: TestClient, sample_media_files):
+        """测试缺少keyword参数（应该返回422错误）"""
+        response = client.get("/api/files/suggest")
+        assert response.status_code == 422
+    
+    def test_suggest_filenames_distinct_results(self, client: TestClient, session: Session):
+        """测试结果去重功能"""
+        # 添加重复的文件名
+        duplicate_files = [
+            MediaFile(
+                inode=2001,
+                device_id=3001,
+                original_filepath="/test1/duplicate.mp4",
+                original_filename="duplicate.mp4",
+                file_size=1000000,
+                status=FileStatus.PENDING
+            ),
+            MediaFile(
+                inode=2002,
+                device_id=3001,
+                original_filepath="/test2/duplicate.mp4",
+                original_filename="duplicate.mp4",
+                file_size=1000000,
+                status=FileStatus.COMPLETED
+            ),
+        ]
+        
+        for media_file in duplicate_files:
+            session.add(media_file)
+        session.commit()
+        
+        response = client.get("/api/files/suggest?keyword=duplicate")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert len(data["suggestions"]) == 1  # 应该去重，只返回一个
+        assert data["suggestions"][0] == "duplicate.mp4"
+    
+    def test_suggest_filenames_empty_database(self, client: TestClient):
+        """测试空数据库"""
+        response = client.get("/api/files/suggest?keyword=any")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["suggestions"] == []
+
 
 class TestRetryAPI:
     """测试重试API端点"""
@@ -445,3 +794,229 @@ class TestStatsAPI:
         }
         
         assert data == expected_stats 
+
+@pytest.fixture(name="basic_media_files")
+def basic_media_files_fixture(session: Session):
+    """提供包含CONFLICT状态在内的媒体文件集合，用于补充测试。"""
+    from app.core.models import MediaFile, FileStatus  # 局部导入避免循环
+
+    media_files = [
+        MediaFile(
+            inode=2001,
+            device_id=3001,
+            original_filepath="/test/retry_failed.mp4",
+            original_filename="retry_failed.mp4",
+            file_size=1000000,
+            status=FileStatus.FAILED,
+        ),
+        MediaFile(
+            inode=2002,
+            device_id=3001,
+            original_filepath="/test/retry_no_match.mp4",
+            original_filename="retry_no_match.mp4",
+            file_size=2000000,
+            status=FileStatus.NO_MATCH,
+        ),
+        MediaFile(
+            inode=2003,
+            device_id=3001,
+            original_filepath="/test/retry_conflict.mp4",
+            original_filename="retry_conflict.mp4",
+            file_size=1500000,
+            status=FileStatus.CONFLICT,
+        ),
+    ]
+    for mf in media_files:
+        session.add(mf)
+    session.commit()
+    for mf in media_files:
+        session.refresh(mf)
+    return media_files
+
+
+class TestRetryAPIAdditional:
+    """补充Retry API的异常及CONFLICT场景测试。"""
+
+    def test_retry_with_queue_exception(self, client: TestClient, basic_media_files, mock_queue):
+        """模拟队列 put 抛出异常，应返回 500。"""
+        from app.core.models import FileStatus
+
+        failed_file = next(f for f in basic_media_files if f.status == FileStatus.FAILED)
+        mock_queue.put.side_effect = Exception("Queue operation failed")
+
+        resp = client.post(f"/api/files/{failed_file.id}/retry")
+        assert resp.status_code == 500
+        data = resp.json()
+        assert "重试操作失败" in data["detail"]
+        assert "Queue operation failed" in data["detail"]
+        mock_queue.put.assert_called_once_with(failed_file.id)
+
+    def test_retry_conflict_status_file(self, client: TestClient, basic_media_files, mock_queue):
+        """CONFLICT 状态文件可成功重试。"""
+        from app.core.models import FileStatus
+
+        conflict_file = next(f for f in basic_media_files if f.status == FileStatus.CONFLICT)
+        resp = client.post(f"/api/files/{conflict_file.id}/retry")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["previous_status"] == FileStatus.CONFLICT
+        assert data["current_status"] == FileStatus.PENDING
+        mock_queue.put.assert_called_once_with(conflict_file.id)
+
+
+class TestFilesAPIEdgeCases:
+    """补充文件列表 API 的极端和特殊字符场景。"""
+
+    def test_files_with_extremely_large_skip(self, client: TestClient, sample_media_files):
+        resp = client.get("/api/files?skip=1000000")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["skip"] == 1000000
+        assert len(data["items"]) == 0
+
+    def test_files_search_with_special_characters(self, client: TestClient, session: Session):
+        from app.core.models import MediaFile, FileStatus
+
+        special = MediaFile(
+            inode=3001,
+            device_id=4001,
+            original_filepath="/test/file-with-special@#$.mp4",
+            original_filename="file-with-special@#$.mp4",
+            file_size=1000000,
+            status=FileStatus.PENDING,
+        )
+        session.add(special)
+        session.commit()
+        session.refresh(special)
+
+        resp = client.get("/api/files?search=@#$")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert "@#$" in data["items"][0]["original_filename"]
+
+
+class TestSuggestAPIEdgeCases:
+    """建议 API 的安全与极端边界测试。"""
+
+    def test_suggest_with_sql_injection_attempt(self, client: TestClient, sample_media_files):
+        malicious = "'; DROP TABLE mediafile; --"
+        resp = client.get(f"/api/files/suggest?keyword={malicious}")
+        assert resp.status_code == 200
+        assert resp.json()["suggestions"] == []
+
+    def test_suggest_with_unicode_characters(self, client: TestClient, session: Session):
+        from app.core.models import MediaFile, FileStatus
+
+        uni_file = MediaFile(
+            inode=4001,
+            device_id=5001,
+            original_filepath="/test/电影名称.mp4",
+            original_filename="电影名称.mp4",
+            file_size=1000000,
+            status=FileStatus.PENDING,
+        )
+        session.add(uni_file)
+        session.commit()
+
+        resp = client.get("/api/files/suggest?keyword=电影")
+        assert resp.status_code == 200
+        assert "电影名称.mp4" in resp.json()["suggestions"]
+
+    def test_suggest_with_very_long_keyword(self, client: TestClient):
+        long_kw = "a" * 1000
+        resp = client.get(f"/api/files/suggest?keyword={long_kw}")
+        assert resp.status_code == 200
+        assert resp.json()["suggestions"] == []
+
+
+class TestStatsAPIEdgeCases:
+    """统计 API 的额外边界测试。"""
+
+    def test_stats_with_only_one_status_type(self, client: TestClient, session: Session):
+        from sqlmodel import delete
+        from app.core.models import MediaFile, FileStatus
+
+        session.exec(delete(MediaFile))
+        for i in range(3):
+            session.add(
+                MediaFile(
+                    inode=5000 + i,
+                    device_id=6001,
+                    original_filepath=f"/test/pending_{i}.mp4",
+                    original_filename=f"pending_{i}.mp4",
+                    file_size=1000000,
+                    status=FileStatus.PENDING,
+                )
+            )
+        session.commit()
+        resp = client.get("/api/stats")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data == {FileStatus.PENDING: 3}
+
+    def test_stats_with_mixed_status_distribution(self, client: TestClient, session: Session):
+        from sqlmodel import delete
+        from app.core.models import MediaFile, FileStatus
+
+        session.exec(delete(MediaFile))
+        status_counts = {
+            FileStatus.PENDING: 3,
+            FileStatus.PROCESSING: 1,
+            FileStatus.COMPLETED: 5,
+            FileStatus.FAILED: 2,
+            FileStatus.CONFLICT: 1,
+            FileStatus.NO_MATCH: 2,
+        }
+        fid = 7000
+        for status, cnt in status_counts.items():
+            for _ in range(cnt):
+                session.add(
+                    MediaFile(
+                        inode=fid,
+                        device_id=8001,
+                        original_filepath=f"/test/{status}_{fid}.mp4",
+                        original_filename=f"{status}_{fid}.mp4",
+                        file_size=1000000,
+                        status=status,
+                    )
+                )
+                fid += 1
+        session.commit()
+        resp = client.get("/api/stats")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert all(data[st] == c for st, c in status_counts.items())
+
+
+class TestMediaFileDetailEdgeCases:
+    """媒体文件详情 API 的额外边界测试。"""
+
+    def test_get_file_with_max_integer_id(self, client: TestClient):
+        max_id = 2_147_483_647
+        resp = client.get(f"/api/files/{max_id}")
+        assert resp.status_code == 404
+
+    def test_get_file_with_float_id_in_url(self, client: TestClient):
+        resp = client.get("/api/files/123.456")
+        assert resp.status_code == 422
+
+
+class TestAPIResponseStructure:
+    """验证API响应结构完整性。"""
+
+    def test_files_response_structure(self, client: TestClient, sample_media_files):
+        resp = client.get("/api/files")
+        data = resp.json()
+        assert set(data.keys()) == {"total", "skip", "limit", "items"}
+        if data["items"]:
+            first = data["items"][0]
+            required = {"id", "inode", "device_id", "original_filepath", "original_filename", "file_size", "status", "created_at", "updated_at"}
+            assert required.issubset(first.keys())
+
+    def test_retry_response_structure(self, client: TestClient, basic_media_files, mock_queue):
+        from app.core.models import FileStatus
+        fail_file = next(f for f in basic_media_files if f.status == FileStatus.FAILED)
+        resp = client.post(f"/api/files/{fail_file.id}/retry")
+        data = resp.json()
+        assert set(data.keys()) == {"message", "file_id", "previous_status", "current_status"} 

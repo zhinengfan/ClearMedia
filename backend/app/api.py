@@ -4,9 +4,9 @@ API路由模块
 提供ClearMedia的REST API端点，包括媒体文件查询、统计等功能。
 """
 
-from typing import Optional
+from typing import Optional, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, or_, distinct
 from loguru import logger
 
 from .db import get_db
@@ -22,15 +22,19 @@ def get_media_files(
     skip: int = Query(0, ge=0, description="跳过的记录数"),
     limit: int = Query(20, ge=1, le=500, description="返回的记录数限制（最大500）"), 
     status: Optional[str] = Query(None, description=f"按状态筛选: {FileStatus.PENDING}, {FileStatus.PROCESSING}, {FileStatus.COMPLETED}, {FileStatus.FAILED}, {FileStatus.CONFLICT}, {FileStatus.NO_MATCH}"),
+    search: Optional[str] = Query(None, description="按文件名模糊搜索"),
+    sort: Optional[Literal["created_at:asc", "created_at:desc"]] = Query("created_at:desc", description="排序方式: created_at:asc 或 created_at:desc"),
     db: Session = Depends(get_db)
 ):
     """
-    查询媒体文件列表，支持分页和状态筛选。
+    查询媒体文件列表，支持分页、状态筛选、文件名搜索和排序。
     
     Args:
         skip: 跳过的记录数（用于分页）
         limit: 返回的记录数限制，默认20，最大500
         status: 可选的状态筛选条件
+        search: 可选的文件名模糊搜索关键词
+        sort: 排序方式，默认按创建时间降序
         db: 数据库会话依赖
         
     Returns:
@@ -56,11 +60,27 @@ def get_media_files(
         statement = statement.where(MediaFile.status == status)
         count_statement = count_statement.where(MediaFile.status == status)
     
+    # 如果提供了搜索关键词，添加文件名模糊搜索条件
+    if search is not None and search.strip():
+        search_term = f"%{search.strip()}%"
+        search_condition = or_(
+            MediaFile.original_filename.ilike(search_term),
+            MediaFile.original_filepath.ilike(search_term)
+        )
+        statement = statement.where(search_condition)
+        count_statement = count_statement.where(search_condition)
+    
     # 获取总记录数
     total = db.exec(count_statement).one()
     
-    # 添加排序、分页并执行查询
-    statement = statement.order_by(MediaFile.created_at.desc()).offset(skip).limit(limit)
+    # 添加排序
+    if sort == "created_at:asc":
+        statement = statement.order_by(MediaFile.created_at.asc())
+    else:  # 默认为 "created_at:desc"
+        statement = statement.order_by(MediaFile.created_at.desc())
+    
+    # 添加分页并执行查询
+    statement = statement.offset(skip).limit(limit)
     media_files = db.exec(statement).all()
     
     return {
@@ -69,6 +89,69 @@ def get_media_files(
         "limit": limit,
         "items": media_files
     }
+
+
+@router.get("/files/suggest")
+def suggest_filenames(
+    keyword: str = Query(..., description="文件名前缀关键字"),
+    limit: int = Query(20, ge=1, le=100, description="返回建议数量限制，默认20，最大100"),
+    db: Session = Depends(get_db)
+):
+    """
+    根据文件名前缀提供自动补全建议。
+    
+    Args:
+        keyword: 文件名前缀关键字（必填）
+        limit: 返回的建议数量限制，默认20，最大100
+        db: 数据库会话依赖
+        
+    Returns:
+        dict: 包含suggestions列表的响应
+    """
+    # 验证关键字不为空
+    if not keyword or not keyword.strip():
+        return {"suggestions": []}
+    
+    # 构建查询语句，使用 DISTINCT 去重，按文件名前缀匹配
+    keyword_clean = keyword.strip()
+    statement = (
+        select(distinct(MediaFile.original_filename))
+        .where(MediaFile.original_filename.ilike(f"{keyword_clean}%"))
+        .limit(limit)
+    )
+    
+    # 执行查询
+    results = db.exec(statement).all()
+    
+    return {"suggestions": list(results)}
+
+
+@router.get("/files/{file_id}")
+def get_media_file(
+    file_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    根据文件ID获取单个媒体文件详情。
+    
+    Args:
+        file_id: 媒体文件的ID
+        db: 数据库会话依赖
+        
+    Returns:
+        MediaFile: 媒体文件详情
+        
+    Raises:
+        HTTPException: 当文件不存在时返回404错误
+    """
+    media_file = get_media_file_by_id(db, file_id)
+    if not media_file:
+        raise HTTPException(
+            status_code=404,
+            detail=f"媒体文件不存在: ID={file_id}"
+        )
+    
+    return media_file
 
 
 @router.get("/stats")
