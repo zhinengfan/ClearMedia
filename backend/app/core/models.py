@@ -70,3 +70,26 @@ class MediaFile(SQLModel, table=True):
     
     # 重试次数计数器
     retry_count: int = Field(default=0, nullable=False, description="当前重试次数") 
+
+
+class ConfigItem(SQLModel, table=True):
+    """
+    存储应用配置项的数据库模型。
+    支持动态配置管理，配置值以JSON格式存储，支持复杂数据结构。
+    """
+    # 配置项的唯一标识符，作为主键
+    key: str = Field(primary_key=True, nullable=False, description="配置项的唯一键名")
+    
+    # 配置值，以JSON字符串格式存储，支持各种数据类型
+    value: str = Field(nullable=False, description="配置项的值，以JSON序列化字符串存储")
+    
+    # 配置项的可选描述说明
+    description: Optional[str] = Field(default=None, description="配置项的描述说明")
+    
+    # 最后更新时间，自动维护
+    updated_at: datetime.datetime = Field(
+        default_factory=utc_now, 
+        nullable=False, 
+        sa_column_kwargs={"onupdate": utc_now},
+        description="配置项最后更新时间"
+    ) 

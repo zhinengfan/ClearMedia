@@ -1,7 +1,7 @@
 """
-API路由模块
+媒体文件API路由模块
 
-提供ClearMedia的REST API端点，包括媒体文件查询、统计等功能。
+提供ClearMedia的媒体文件相关REST API端点，包括媒体文件查询、统计等功能。
 """
 
 from typing import Optional, Literal
@@ -9,15 +9,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session, select, func, or_, distinct
 from loguru import logger
 
-from .db import get_db
-from .core.models import MediaFile, FileStatus
-from .crud import get_media_file_by_id, update_media_file_status
+from ...db import get_db
+from ...core.models import MediaFile, FileStatus
+from ...crud import get_media_file_by_id, update_media_file_status
 
 
-router = APIRouter(prefix="/api", tags=["media"])
+media_router = APIRouter(prefix="/api", tags=["media"])
 
 
-@router.get("/files")
+@media_router.get("/files")
 def get_media_files(
     skip: int = Query(0, ge=0, description="跳过的记录数"),
     limit: int = Query(20, ge=1, le=500, description="返回的记录数限制（最大500）"), 
@@ -91,7 +91,7 @@ def get_media_files(
     }
 
 
-@router.get("/files/suggest")
+@media_router.get("/files/suggest")
 def suggest_filenames(
     keyword: str = Query(..., description="文件名前缀关键字"),
     limit: int = Query(20, ge=1, le=100, description="返回建议数量限制，默认20，最大100"),
@@ -126,7 +126,7 @@ def suggest_filenames(
     return {"suggestions": list(results)}
 
 
-@router.get("/files/{file_id}")
+@media_router.get("/files/{file_id}")
 def get_media_file(
     file_id: int,
     db: Session = Depends(get_db)
@@ -154,7 +154,7 @@ def get_media_file(
     return media_file
 
 
-@router.get("/stats")
+@media_router.get("/stats")
 def get_media_stats(db: Session = Depends(get_db)):
     """
     获取按状态分组的媒体文件数量统计。
@@ -180,7 +180,7 @@ def get_media_stats(db: Session = Depends(get_db)):
     return stats
 
 
-@router.post("/files/{file_id}/retry")
+@media_router.post("/files/{file_id}/retry")
 async def retry_media_file(
     file_id: int,
     request: Request,

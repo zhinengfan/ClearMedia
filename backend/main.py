@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from loguru import logger
-from app.config import settings
-from app.api import router as api_router
+from app.config import settings, cleanup_deprecated_configs
+from app.api import router as api_router, tags_metadata
 
 import asyncio
 from app.db import create_db_and_tables, get_session_factory
@@ -30,6 +30,12 @@ async def lifespan(app: FastAPI):
     logger.info("应用启动，开始初始化...")
     create_db_and_tables()
     logger.info("数据库和表初始化完成")
+    
+    # 清理数据库中的废弃配置项
+    logger.info("开始清理废弃配置项...")
+    cleanup_deprecated_configs()
+    logger.info("废弃配置项清理完成")
+    
     db_session_factory = get_session_factory()
     
     # 将队列保存到app.state中，供API路由访问
@@ -95,7 +101,7 @@ async def lifespan(app: FastAPI):
     
     logger.info("所有后台任务已关闭")
 
-app = FastAPI(title="ClearMedia API", lifespan=lifespan)
+app = FastAPI(title="ClearMedia API", lifespan=lifespan, openapi_tags=tags_metadata)
 
 # 添加 CORS 中间件
 app.add_middleware(

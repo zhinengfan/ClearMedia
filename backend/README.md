@@ -133,6 +133,28 @@ curl -X POST 'http://localhost:8000/api/files/123/retry'
 
 ---
 
+#### 6. GET `/config`
+获取当前系统配置（敏感字段已脱敏）。
+
+**示例**
+```bash
+curl 'http://localhost:8000/api/config'
+```
+
+---
+
+#### 7. POST `/config`
+批量更新系统配置并触发热重载，仅支持白名单字段。
+
+**示例**
+```bash
+curl -X POST 'http://localhost:8000/api/config' \
+     -H 'Content-Type: application/json' \
+     -d '{"LOG_LEVEL": "INFO", "TMDB_CONCURRENCY": 8}'
+```
+
+---
+
 ### 查看 Swagger UI / ReDoc
 
 构建并运行容器后，打开以下地址获取 OpenAPI 文档：

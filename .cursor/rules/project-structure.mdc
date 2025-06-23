@@ -6,7 +6,7 @@ alwaysApply: true
 # Global rules for the full-stack project
 The project is a full-stack application with:
 - Backend: Located in /backend, built with FastAPI (Python), providing REST APIs at /api/* endpoints.
-- Frontend: Located in /frontend, built with Nuxt, consuming backend APIs.
+- Frontend: Located in /frontend, built with React, consuming backend APIs.
 When working on frontend code, reference backend API schemas in /backend/app/api for context.
 When modifying backend APIs, ensure compatibility with frontend fetch calls in /frontend/.
 When running backend python environment tests, you need to run it in the root directory. The .env file is in the root directory. If you switch to the backend directory, the env file will not be able to be read.
