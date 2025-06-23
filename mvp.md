@@ -58,19 +58,26 @@
 │   │   │   └── endpoints/
 │   │   │       ├── media.py  #   媒体相关路由
 │   │   │       └── config.py #   配置管理路由
-│   │   ├── crud.py            # ★ 数据库增删改查
+│   │   ├── services/         # ★ 服务层（按领域划分）
+│   │   │   ├── config/       #   配置管理服务
+│   │   │   │   ├── __init__.py    # 导出 ConfigService 等
+│   │   │   │   └── service.py     # 配置 CRUD 操作
+│   │   │   ├── media/        #   媒体文件服务
+│   │   │   │   ├── __init__.py    # 导出处理和扫描功能
+│   │   │   │   ├── processor.py   # ★ 媒体文件处理器
+│   │   │   │   └── scanner.py     # ★ 目录扫描器
+│   │   │   └── __init__.py   #   统一服务层接口
+│   │   ├── crud.py           # ★ 数据库增删改查
 │   │   ├── db.py
-│   │   ├── processor.py       # ★ 核心处理逻辑
-│   │   ├── scanner.py         # ★ 文件扫描逻辑
 │   │   ├── config.py
-│   │   ├── core/              # ★ 核心工具/模型
+│   │   ├── core/             # ★ 核心工具/模型
 │   │   │   ├── __init__.py
 │   │   │   ├── llm.py
 │   │   │   ├── tmdb.py
 │   │   │   ├── linker.py
 │   │   │   └── models.py
 │   │   └── tests/
-│   ├── main.py                # ★ FastAPI应用入口
+│   ├── main.py               # ★ FastAPI应用入口
 │   ├── Dockerfile
 │   ├── pyproject.toml
 │   └── requirements.txt
@@ -80,6 +87,18 @@
 ├── docker-compose.yml
 └── README.md
 ```
+
+#### **1.1 服务层架构说明**
+
+后端服务按照领域驱动设计原则组织代码结构，服务层按领域划分：
+
+- **config**: 负责配置项的数据库 CRUD 操作，支持白名单验证和动态配置更新
+- **media**: 负责媒体文件的扫描、处理和管理，包括文件发现、元数据提取、硬链接创建等
+
+所有服务层模块都通过 `services/__init__.py` 统一暴露接口，便于外部模块导入和使用。这种架构使得：
+- **模块职责清晰**: 每个服务专注于特定领域
+- **依赖关系简单**: 统一的导入接口减少模块间耦合
+- **扩展性良好**: 新增领域服务时遵循相同模式
 
 #### **2. 技术栈**
 
@@ -242,3 +261,17 @@
         5.  **步骤3: 生成新路径。** 根据TMDB的结果，计算出标准化的目标文件路径，支持电影和电视剧两种格式。
         6.  **步骤4: 创建链接。** 调用 `linker.create_hardlink()`，并根据返回结果处理成功、冲突或失败等情况。
         7.  **最终状态更新:** 在`finally`块中，根据处理是否成功，将任务状态更新为 `COMPLETED` 或 `FAILED`。如果链接时发生路径冲突或TMDB无匹配，则特殊处理为 `CONFLICT` 或 `NO_MATCH` 状态。
+
+
+
+设计上确实可以彻底把「发现（生产）」和「处理（消费）」解耦，核心改动思路如下。
+1. 角色职责重新划分
+1) scanner 任务（Producer-A）
+纯粹负责 OS 目录递归 → 入库，所有新文件都设为 PENDING，不再把 ID 放入队列。
+2) producer 任务（Producer-B）
+以固定间隔（如 N 秒）轮询数据库，按「入库顺序 / id 递增」选出可处理的记录并放入队列。
+将其状态从 PENDING → QUEUED（新增枚举值）以避免重复投递。
+也可选择把 FAILED / NO_MATCH / CONFLICT 且标记为“可重试”的数据再次投递。
+3) worker 任务（Consumer）
+与现在相同：await queue.get() → process_media_file()
+取到 ID 后立即把状态从 QUEUED → PROCESSING。

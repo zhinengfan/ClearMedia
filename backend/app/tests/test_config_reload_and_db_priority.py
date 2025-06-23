@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 from app.core.models import ConfigItem
 from app.config import get_settings, cleanup_deprecated_configs
-from app.services.config_service import ConfigService
+from app.services.config import ConfigService
 
 
 class TestConfigDatabasePriority:

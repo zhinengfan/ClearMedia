@@ -14,8 +14,8 @@ from typing import Set, Callable, List
 from loguru import logger
 from sqlmodel import Session
 
-from . import crud
-from .config import Settings
+from ... import crud
+from ...config import Settings
 
 # 常量定义
 SCANNER_LOG_PREFIX = "[Scanner]"

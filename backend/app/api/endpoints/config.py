@@ -11,7 +11,7 @@ from loguru import logger
 
 from ...db import get_db
 from ...config import get_settings
-from ...services.config_service import ConfigService, WRITABLE_CONFIG_KEYS
+from ...services.config import ConfigService, WRITABLE_CONFIG_KEYS
 
 
 config_router = APIRouter(prefix="/api", tags=["config"])

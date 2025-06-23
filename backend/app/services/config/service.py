@@ -10,8 +10,8 @@ from typing import Dict, Any
 from sqlmodel import Session, select
 from pydantic import ValidationError
 
-from ..core.models import ConfigItem
-from ..config import Settings
+from ...core.models import ConfigItem
+from ...config import Settings
 
 
 # 定义可写配置项白名单 - 排除敏感和基础设施配置

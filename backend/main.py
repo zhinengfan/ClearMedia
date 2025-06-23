@@ -8,8 +8,7 @@ from app.api import router as api_router, tags_metadata
 
 import asyncio
 from app.db import create_db_and_tables, get_session_factory
-from app.processor import process_media_file
-from app.scanner import background_scanner_task
+from app.services.media import process_media_file, background_scanner_task
 
 # 配置日志
 logger.remove()

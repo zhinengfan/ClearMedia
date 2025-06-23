@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.config import Settings
-from app.scanner import background_scanner_task
+from app.services.media import background_scanner_task
 
 
 class TestBackgroundScannerTask:
@@ -48,7 +48,7 @@ class TestBackgroundScannerTask:
     ):
         """测试后台扫描任务的优雅启动和停止"""
         # 模拟scan_directory_once函数
-        mock_scan = mocker.patch('app.scanner.scan_directory_once')
+        mock_scan = mocker.patch('app.services.media.scanner.scan_directory_once')
         mock_scan.return_value = 2  # 模拟发现2个新文件
         
         # 启动后台任务
@@ -78,7 +78,7 @@ class TestBackgroundScannerTask:
     ):
         """测试后台扫描任务定期调用扫描函数"""
         # 模拟scan_directory_once函数
-        mock_scan = mocker.patch('app.scanner.scan_directory_once')
+        mock_scan = mocker.patch('app.services.media.scanner.scan_directory_once')
         mock_scan.return_value = 1
         
         # 启动后台任务
@@ -109,7 +109,7 @@ class TestBackgroundScannerTask:
     ):
         """测试后台扫描任务处理扫描异常"""
         # 模拟scan_directory_once抛出异常
-        mock_scan = mocker.patch('app.scanner.scan_directory_once')
+        mock_scan = mocker.patch('app.services.media.scanner.scan_directory_once')
         mock_scan.side_effect = Exception("模拟扫描错误")
         
         # 启动后台任务
@@ -136,7 +136,7 @@ class TestBackgroundScannerTask:
     ):
         """测试后台扫描任务在没有提供stop_event时的行为"""
         # 模拟scan_directory_once函数
-        mock_scan = mocker.patch('app.scanner.scan_directory_once')
+        mock_scan = mocker.patch('app.services.media.scanner.scan_directory_once')
         mock_scan.return_value = 0
         
         # 启动后台任务（不提供stop_event）
@@ -174,7 +174,7 @@ class TestBackgroundScannerTask:
         session_factory = MagicMock(return_value=mock_session)
         
         # 模拟scan_directory_once函数
-        mock_scan = mocker.patch('app.scanner.scan_directory_once')
+        mock_scan = mocker.patch('app.services.media.scanner.scan_directory_once')
         mock_scan.return_value = 0
         
         # 启动后台任务
@@ -205,7 +205,7 @@ class TestBackgroundScannerTask:
         mock_settings.SCAN_INTERVAL_SECONDS = 2
         
         # 模拟scan_directory_once函数
-        mock_scan = mocker.patch('app.scanner.scan_directory_once')
+        mock_scan = mocker.patch('app.services.media.scanner.scan_directory_once')
         mock_scan.return_value = 0
         
         # 记录开始时间

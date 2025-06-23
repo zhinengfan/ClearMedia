@@ -44,7 +44,7 @@ class TestScanDirectoryOnce:
         allowed_extensions = {'.mp4', '.mkv', '.avi', '.mov'}
         
         # 导入并调用待测试函数
-        from ..scanner import scan_directory_once
+        from ..services.media import scan_directory_once
         
         # 执行扫描
         scan_directory_once(mock_db_session, settings, allowed_extensions)
@@ -88,7 +88,7 @@ class TestScanDirectoryOnce:
         allowed_extensions = {'.mp4', '.mkv', '.avi', '.mov'}
         
         # 导入并调用待测试函数
-        from ..scanner import scan_directory_once
+        from ..services.media import scan_directory_once
         
         # 执行扫描
         scan_directory_once(mock_db_session, settings, allowed_extensions)
@@ -130,7 +130,7 @@ class TestScanDirectoryOnce:
         allowed_extensions = {'.mp4', '.mkv', '.avi', '.mov'}
         
         # 导入并调用待测试函数
-        from ..scanner import scan_directory_once
+        from ..services.media import scan_directory_once
         
         # 执行扫描
         scan_directory_once(mock_db_session, settings, allowed_extensions)
@@ -165,7 +165,7 @@ class TestScanDirectoryOnce:
         allowed_extensions = {'.mp4', '.mkv', '.avi', '.mov'}
         
         # 导入并调用待测试函数
-        from ..scanner import scan_directory_once
+        from ..services.media import scan_directory_once
         
         # 执行扫描
         scan_directory_once(mock_db_session, settings, allowed_extensions)
@@ -215,7 +215,7 @@ class TestScanDirectoryOnce:
         allowed_extensions = {'.mp4', '.mkv', '.avi', '.mov'}
         
         # 导入并调用待测试函数
-        from ..scanner import scan_directory_once
+        from ..services.media import scan_directory_once
         
         # 执行扫描
         scan_directory_once(mock_db_session, settings, allowed_extensions)

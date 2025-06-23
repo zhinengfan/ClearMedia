@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 from sqlmodel import Session, create_engine, SQLModel
 from sqlalchemy.pool import StaticPool
 
-from app.processor import process_media_file
+from app.services.media import process_media_file
 from app.core.models import MediaFile, FileStatus
 from app.core.linker import LinkResult
 from app.config import Settings
@@ -104,7 +104,7 @@ async def test_process_media_file_success(
     
     # 模拟 Linker 成功
     mock_create_hardlink = MagicMock(return_value=LinkResult.LINK_SUCCESS)
-    monkeypatch.setattr("app.processor.create_hardlink", mock_create_hardlink)
+    monkeypatch.setattr("app.services.media.processor.create_hardlink", mock_create_hardlink)
     
     # 执行处理
     await process_media_file(sample_media_file.id, db_session_factory, test_settings)
@@ -216,7 +216,7 @@ async def test_process_media_file_linker_failure(
     
     # 模拟 Linker 失败
     mock_create_hardlink = MagicMock(return_value=LinkResult.LINK_FAILED_UNKNOWN)
-    monkeypatch.setattr("app.processor.create_hardlink", mock_create_hardlink)
+    monkeypatch.setattr("app.services.media.processor.create_hardlink", mock_create_hardlink)
     
     # 执行处理
     await process_media_file(sample_media_file.id, db_session_factory, test_settings)
@@ -264,7 +264,7 @@ async def test_process_media_file_linker_conflict(
     
     # 模拟 Linker 冲突
     mock_create_hardlink = MagicMock(return_value=LinkResult.LINK_FAILED_CONFLICT)
-    monkeypatch.setattr("app.processor.create_hardlink", mock_create_hardlink)
+    monkeypatch.setattr("app.services.media.processor.create_hardlink", mock_create_hardlink)
     
     # 执行处理
     await process_media_file(sample_media_file.id, db_session_factory, test_settings)
@@ -313,7 +313,7 @@ async def test_process_media_file_tmdb_disabled(
     
     # 模拟 Linker 成功（但不会被调用，因为没有TMDB数据）
     mock_create_hardlink = MagicMock(return_value=LinkResult.LINK_SUCCESS)
-    monkeypatch.setattr("app.processor.create_hardlink", mock_create_hardlink)
+    monkeypatch.setattr("app.services.media.processor.create_hardlink", mock_create_hardlink)
     
     # 执行处理
     await process_media_file(sample_media_file.id, db_session_factory, test_settings_tmdb_disabled)
@@ -357,7 +357,7 @@ async def test_process_media_file_tmdb_no_match(
     
     # 模拟 Linker（不应被调用，因为没有TMDB数据）
     mock_create_hardlink = MagicMock(return_value=LinkResult.LINK_SUCCESS)
-    monkeypatch.setattr("app.processor.create_hardlink", mock_create_hardlink)
+    monkeypatch.setattr("app.services.media.processor.create_hardlink", mock_create_hardlink)
     
     # 执行处理
     result = await process_media_file(sample_media_file.id, db_session_factory, test_settings)
@@ -416,7 +416,7 @@ async def test_process_media_file_tmdb_hybrid_search_correct_type(
     
     # 模拟 Linker 成功
     mock_create_hardlink = MagicMock(return_value=LinkResult.LINK_SUCCESS)
-    monkeypatch.setattr("app.processor.create_hardlink", mock_create_hardlink)
+    monkeypatch.setattr("app.services.media.processor.create_hardlink", mock_create_hardlink)
     
     # 执行处理
     result = await process_media_file(sample_media_file.id, db_session_factory, test_settings)

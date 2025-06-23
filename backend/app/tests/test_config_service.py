@@ -13,7 +13,7 @@ import pytest
 from sqlmodel import Session, SQLModel, create_engine, select
 from pydantic import ValidationError
 
-from app.services.config_service import ConfigService, WRITABLE_CONFIG_KEYS, EXCLUDED_CONFIG_KEYS
+from app.services.config import ConfigService, WRITABLE_CONFIG_KEYS, EXCLUDED_CONFIG_KEYS
 from app.core.models import ConfigItem
 
 

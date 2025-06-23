@@ -68,7 +68,7 @@ from sqlmodel import Session
 
 from app.config import settings          # 直接读取 .env
 from app.db import create_db_and_tables, engine
-from app.scanner import scan_directory_once
+from app.services.media import scan_directory_once
 
 
 def main() -> None:
