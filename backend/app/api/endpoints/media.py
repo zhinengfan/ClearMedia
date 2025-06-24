@@ -5,13 +5,17 @@
 """
 
 from typing import Optional, Literal
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, or_, distinct
 from loguru import logger
 
 from ...db import get_db
 from ...core.models import MediaFile, FileStatus
 from ...crud import get_media_file_by_id, update_media_file_status
+
+
+# 定义可重试的文件状态常量（使用元组确保只读）
+RETRYABLE_STATUSES = (FileStatus.FAILED, FileStatus.NO_MATCH, FileStatus.CONFLICT)
 
 
 media_router = APIRouter(prefix="/api", tags=["media"])
@@ -21,7 +25,7 @@ media_router = APIRouter(prefix="/api", tags=["media"])
 def get_media_files(
     skip: int = Query(0, ge=0, description="跳过的记录数"),
     limit: int = Query(20, ge=1, le=500, description="返回的记录数限制（最大500）"), 
-    status: Optional[str] = Query(None, description=f"按状态筛选: {FileStatus.PENDING}, {FileStatus.PROCESSING}, {FileStatus.COMPLETED}, {FileStatus.FAILED}, {FileStatus.CONFLICT}, {FileStatus.NO_MATCH}"),
+    status: Optional[str] = Query(None, description=f"按状态筛选: {FileStatus.PENDING}, {FileStatus.QUEUED}, {FileStatus.PROCESSING}, {FileStatus.COMPLETED}, {FileStatus.FAILED}, {FileStatus.CONFLICT}, {FileStatus.NO_MATCH}"),
     search: Optional[str] = Query(None, description="按文件名模糊搜索"),
     sort: Optional[Literal["created_at:asc", "created_at:desc"]] = Query("created_at:desc", description="排序方式: created_at:asc 或 created_at:desc"),
     db: Session = Depends(get_db)
@@ -48,7 +52,7 @@ def get_media_files(
     if status is not None:
         # 验证状态值是否有效
         valid_statuses = [
-            FileStatus.PENDING, FileStatus.PROCESSING, FileStatus.COMPLETED,
+            FileStatus.PENDING, FileStatus.QUEUED, FileStatus.PROCESSING, FileStatus.COMPLETED,
             FileStatus.FAILED, FileStatus.CONFLICT, FileStatus.NO_MATCH
         ]
         if status not in valid_statuses:
@@ -183,22 +187,36 @@ def get_media_stats(db: Session = Depends(get_db)):
 @media_router.post("/files/{file_id}/retry")
 async def retry_media_file(
     file_id: int,
-    request: Request,
     db: Session = Depends(get_db)
 ):
     """
     手动重试处理失败或无匹配的媒体文件。
     
+    该接口仅将文件状态重置为 PENDING，由后台 Producer 统一重新入队。
+    
+    处理流程：
+    1. API 验证文件存在性和状态合法性
+    2. 将文件状态从失败状态（FAILED/NO_MATCH/CONFLICT）重置为 PENDING
+    3. 后台 Producer 组件会定期轮询 PENDING 状态的文件
+    4. Producer 将这些文件ID加入处理队列
+    5. Worker 从队列获取文件ID并执行实际的媒体文件处理
+    
     Args:
         file_id: 媒体文件的ID
-        request: FastAPI请求对象，用于访问app.state
         db: 数据库会话依赖
         
     Returns:
-        dict: 操作结果信息
+        dict: 包含以下字段的操作结果：
+            - message: 操作结果描述
+            - file_id: 文件ID
+            - previous_status: 重置前的状态
+            - current_status: 重置后的状态（始终为 PENDING）
         
     Raises:
-        HTTPException: 当文件不存在或状态不允许重试时抛出
+        HTTPException: 
+            - 404: 当文件不存在时
+            - 400: 当文件状态不允许重试时（非 FAILED/NO_MATCH/CONFLICT）
+            - 500: 当数据库操作失败时
     """
     # 从数据库获取媒体文件
     media_file = get_media_file_by_id(db, file_id)
@@ -209,15 +227,11 @@ async def retry_media_file(
         )
     
     # 检查文件状态是否允许重试
-    retryable_statuses = [FileStatus.FAILED, FileStatus.NO_MATCH, FileStatus.CONFLICT]
-    if media_file.status not in retryable_statuses:
+    if media_file.status not in RETRYABLE_STATUSES:
         raise HTTPException(
             status_code=400,
-            detail=f"文件状态不允许重试: 当前状态={media_file.status}, 可重试状态: {', '.join(retryable_statuses)}"
+            detail=f"文件状态不允许重试: 当前状态={media_file.status}, 可重试状态: {', '.join(RETRYABLE_STATUSES)}"
         )
-    
-    # 获取队列实例
-    media_queue = request.app.state.media_queue
     
     try:
         # 保存原始状态
@@ -226,13 +240,10 @@ async def retry_media_file(
         # 更新状态为PENDING
         update_media_file_status(db, media_file, FileStatus.PENDING)
         
-        # 将文件ID放入处理队列
-        await media_queue.put(file_id)
-        
-        logger.info(f"媒体文件 {file_id} 已重新排队处理")
+        logger.info(f"媒体文件 {file_id} 状态已重置为 PENDING，等待 Producer 重新排队")
         
         return {
-            "message": "文件已成功排队重新处理",
+            "message": "文件状态已成功重置，等待后台重新处理",
             "file_id": file_id,
             "previous_status": previous_status,
             "current_status": FileStatus.PENDING

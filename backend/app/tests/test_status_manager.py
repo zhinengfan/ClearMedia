@@ -12,6 +12,7 @@ from app.core.models import MediaFile, FileStatus
 from app.services.media.status_manager import (
     update_status,
     set_processing,
+    set_queued,
     set_completed,
     set_failed,
     set_no_match,
@@ -133,6 +134,19 @@ class TestSetProcessing:
         with db_session_factory() as session:
             updated_file = session.get(MediaFile, sample_media_file.id)
             assert updated_file.status == FileStatus.PROCESSING
+            assert updated_file.error_message is None
+
+
+class TestSetQueued:
+    """测试设置队列中状态"""
+    
+    def test_set_queued(self, db_session_factory, sample_media_file):
+        """测试设置为队列中状态"""
+        set_queued(db_session_factory, sample_media_file.id)
+        
+        with db_session_factory() as session:
+            updated_file = session.get(MediaFile, sample_media_file.id)
+            assert updated_file.status == FileStatus.QUEUED
             assert updated_file.error_message is None
 
 

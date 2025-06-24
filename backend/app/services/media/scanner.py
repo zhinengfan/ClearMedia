@@ -258,13 +258,13 @@ async def background_scanner_task(
                 if new_file_ids:
                     logger.info(f"{SCANNER_LOG_PREFIX} 第 {scan_count} 次扫描发现 {len(new_file_ids)} 个新文件")
                     
-                    # 将新文件ID放入队列
+                    # 将新文件ID放入队列（仅当提供了队列时）
                     if media_queue is not None:
                         for file_id in new_file_ids:
                             await media_queue.put(file_id)
                             logger.debug(f"{SCANNER_LOG_PREFIX} 文件ID {file_id} 已放入处理队列")
                     else:
-                        logger.warning(f"{SCANNER_LOG_PREFIX} 媒体队列未提供，无法放入新文件ID")
+                        logger.debug(f"{SCANNER_LOG_PREFIX} 媒体队列未提供，新文件仅存储到数据库")
                 else:
                     logger.debug(f"{SCANNER_LOG_PREFIX} 第 {scan_count} 次扫描未发现新文件")
                     

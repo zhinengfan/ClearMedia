@@ -100,6 +100,14 @@ def sample_media_files_fixture(session: Session):
             file_size=3000000,
             status=FileStatus.PROCESSING
         ),
+        MediaFile(
+            inode=1006,
+            device_id=2001,
+            original_filepath="/test/queued.mp4",
+            original_filename="queued.mp4",
+            file_size=2500000,
+            status=FileStatus.QUEUED
+        ),
     ]
     
     for media_file in media_files:
@@ -134,10 +142,10 @@ class TestMediaFilesAPI:
         assert "limit" in data
         assert "items" in data
         
-        assert data["total"] == 5
+        assert data["total"] == 6  # 现在包含QUEUED状态文件
         assert data["skip"] == 0
         assert data["limit"] == 20
-        assert len(data["items"]) == 5
+        assert len(data["items"]) == 6
     
     def test_get_files_with_limit(self, client: TestClient, sample_media_files):
         """测试带limit参数的查询"""
@@ -145,7 +153,7 @@ class TestMediaFilesAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["total"] == 5
+        assert data["total"] == 6  # 现在包含QUEUED状态文件
         assert data["limit"] == 3
         assert len(data["items"]) == 3
     
@@ -155,7 +163,7 @@ class TestMediaFilesAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["total"] == 5
+        assert data["total"] == 6  # 现在包含QUEUED状态文件
         assert data["skip"] == 2
         assert data["limit"] == 2
         assert len(data["items"]) == 2
@@ -189,6 +197,16 @@ class TestMediaFilesAPI:
         assert data["total"] == 1
         assert len(data["items"]) == 1
         assert data["items"][0]["status"] == FileStatus.NO_MATCH
+
+    def test_get_files_with_queued_status(self, client: TestClient, sample_media_files):
+        """测试查询QUEUED状态的文件"""
+        response = client.get(f"/api/files?status={FileStatus.QUEUED}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 1
+        assert len(data["items"]) == 1
+        assert data["items"][0]["status"] == FileStatus.QUEUED
     
     def test_get_files_invalid_status(self, client: TestClient, sample_media_files):
         """测试无效状态值"""
@@ -251,8 +269,8 @@ class TestMediaFilesAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["total"] == 5  # 所有文件都在/test/目录下
-        assert len(data["items"]) == 5
+        assert data["total"] == 6  # 所有文件都在/test/目录下，现在包含QUEUED状态文件
+        assert len(data["items"]) == 6
     
     def test_get_files_search_case_insensitive(self, client: TestClient, sample_media_files):
         """测试搜索大小写不敏感"""
@@ -278,8 +296,8 @@ class TestMediaFilesAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["total"] == 5  # 空搜索应该返回所有结果
-        assert len(data["items"]) == 5
+        assert data["total"] == 6  # 空搜索应该返回所有结果，现在包含QUEUED状态文件
+        assert len(data["items"]) == 6
     
     def test_get_files_search_whitespace_only(self, client: TestClient, sample_media_files):
         """测试只包含空格的搜索"""
@@ -287,8 +305,8 @@ class TestMediaFilesAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["total"] == 5  # 只有空格的搜索应该返回所有结果
-        assert len(data["items"]) == 5
+        assert data["total"] == 6  # 只有空格的搜索应该返回所有结果，现在包含QUEUED状态文件
+        assert len(data["items"]) == 6
     
     def test_get_files_sort_created_at_asc(self, client: TestClient, sample_media_files):
         """测试按创建时间升序排序"""
@@ -445,6 +463,7 @@ class TestMediaFileDetailAPI:
             FileStatus.FAILED: next(f for f in sample_media_files if f.status == FileStatus.FAILED),
             FileStatus.NO_MATCH: next(f for f in sample_media_files if f.status == FileStatus.NO_MATCH),
             FileStatus.PROCESSING: next(f for f in sample_media_files if f.status == FileStatus.PROCESSING),
+            FileStatus.QUEUED: next(f for f in sample_media_files if f.status == FileStatus.QUEUED),
         }
         
         for status, file_obj in status_files.items():
@@ -594,13 +613,13 @@ class TestRetryAPI:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["message"] == "文件已成功排队重新处理"
+        assert "文件状态已成功重置" in data["message"]
         assert data["file_id"] == failed_file.id
         assert data["previous_status"] == FileStatus.FAILED
         assert data["current_status"] == FileStatus.PENDING
         
-        # 验证队列被调用
-        mock_queue.put.assert_called_once_with(failed_file.id)
+        # 验证队列未被调用
+        mock_queue.put.assert_not_called()
         
         # 验证数据库状态已更新
         session.refresh(failed_file)
@@ -618,8 +637,8 @@ class TestRetryAPI:
         assert data["previous_status"] == FileStatus.NO_MATCH
         assert data["current_status"] == FileStatus.PENDING
         
-        # 验证队列被调用
-        mock_queue.put.assert_called_once_with(no_match_file.id)
+        # 验证队列未被调用
+        mock_queue.put.assert_not_called()
         
         # 验证数据库状态已更新
         session.refresh(no_match_file)
@@ -679,6 +698,20 @@ class TestRetryAPI:
         # 验证队列未被调用
         mock_queue.put.assert_not_called()
 
+    def test_retry_queued_file_not_allowed(self, client: TestClient, sample_media_files, mock_queue):
+        """测试重试QUEUED状态的文件（不允许）"""
+        # 找到QUEUED状态的文件
+        queued_file = next(f for f in sample_media_files if f.status == FileStatus.QUEUED)
+        
+        response = client.post(f"/api/files/{queued_file.id}/retry")
+        assert response.status_code == 400
+        
+        data = response.json()
+        assert "文件状态不允许重试" in data["detail"]
+        
+        # 验证队列未被调用
+        mock_queue.put.assert_not_called()
+
 
 class TestStatsAPI:
     """测试统计API端点"""
@@ -690,13 +723,14 @@ class TestStatsAPI:
         
         data = response.json()
         
-        # 验证返回的统计数据
+        # 验证返回的统计数据，现在包含QUEUED状态
         expected_stats = {
             FileStatus.PENDING: 1,
             FileStatus.COMPLETED: 1,
             FileStatus.FAILED: 1,
             FileStatus.NO_MATCH: 1,
-            FileStatus.PROCESSING: 1
+            FileStatus.PROCESSING: 1,
+            FileStatus.QUEUED: 1
         }
         
         assert data == expected_stats
@@ -837,21 +871,7 @@ def basic_media_files_fixture(session: Session):
 class TestRetryAPIAdditional:
     """补充Retry API的异常及CONFLICT场景测试。"""
 
-    def test_retry_with_queue_exception(self, client: TestClient, basic_media_files, mock_queue):
-        """模拟队列 put 抛出异常，应返回 500。"""
-        from app.core.models import FileStatus
-
-        failed_file = next(f for f in basic_media_files if f.status == FileStatus.FAILED)
-        mock_queue.put.side_effect = Exception("Queue operation failed")
-
-        resp = client.post(f"/api/files/{failed_file.id}/retry")
-        assert resp.status_code == 500
-        data = resp.json()
-        assert "重试操作失败" in data["detail"]
-        assert "Queue operation failed" in data["detail"]
-        mock_queue.put.assert_called_once_with(failed_file.id)
-
-    def test_retry_conflict_status_file(self, client: TestClient, basic_media_files, mock_queue):
+    def test_retry_conflict_status_file(self, client: TestClient, basic_media_files, mock_queue, session: Session):
         """CONFLICT 状态文件可成功重试。"""
         from app.core.models import FileStatus
 
@@ -861,7 +881,13 @@ class TestRetryAPIAdditional:
         data = resp.json()
         assert data["previous_status"] == FileStatus.CONFLICT
         assert data["current_status"] == FileStatus.PENDING
-        mock_queue.put.assert_called_once_with(conflict_file.id)
+        
+        # 验证队列未被调用
+        mock_queue.put.assert_not_called()
+        
+        # 验证数据库状态
+        session.refresh(conflict_file)
+        assert conflict_file.status == FileStatus.PENDING
 
 
 class TestFilesAPIEdgeCases:
@@ -962,6 +988,7 @@ class TestStatsAPIEdgeCases:
         session.exec(delete(MediaFile))
         status_counts = {
             FileStatus.PENDING: 3,
+            FileStatus.QUEUED: 1,
             FileStatus.PROCESSING: 1,
             FileStatus.COMPLETED: 5,
             FileStatus.FAILED: 2,

@@ -10,6 +10,7 @@ def utc_now() -> datetime.datetime:
 # 定义文件状态的枚举值，便于管理和引用
 class FileStatus:
     PENDING = "PENDING"
+    QUEUED = "QUEUED"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
@@ -44,7 +45,7 @@ class MediaFile(SQLModel, table=True):
         default=FileStatus.PENDING, 
         index=True, 
         nullable=False,
-        description=f"文件当前处理状态: {FileStatus.PENDING}, {FileStatus.PROCESSING}, {FileStatus.COMPLETED}, {FileStatus.FAILED}, {FileStatus.CONFLICT}, {FileStatus.NO_MATCH}"
+        description=f"文件当前处理状态: {FileStatus.PENDING}, {FileStatus.QUEUED}, {FileStatus.PROCESSING}, {FileStatus.COMPLETED}, {FileStatus.FAILED}, {FileStatus.CONFLICT}, {FileStatus.NO_MATCH}"
     )
     
     # --------------------------------------------------------------------------

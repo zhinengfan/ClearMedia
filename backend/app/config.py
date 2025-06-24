@@ -185,6 +185,20 @@ class Settings(BaseSettings):
         ge=1,
         le=10
     )
+    
+    # —— Producer 配置 ——
+    PRODUCER_BATCH_SIZE: int = Field(
+        default=10,
+        description="Producer 每次从数据库获取并处理的文件数量",
+        ge=1,
+        le=100
+    )
+    PRODUCER_INTERVAL_SECONDS: int = Field(
+        default=5,
+        description="Producer 轮询间隔时间（秒）",
+        ge=1,
+        le=300
+    )
 
     # —— CORS 跨域配置 ——
     CORS_ORIGINS: str = Field(

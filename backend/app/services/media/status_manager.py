@@ -63,6 +63,19 @@ def set_processing(
     )
 
 
+def set_queued(
+    db_session_factory: Callable[[], Session],
+    media_file_id: int
+) -> None:
+    """设置为队列中状态"""
+    update_status(
+        db_session_factory,
+        media_file_id,
+        status=FileStatus.QUEUED,
+        error_message=None
+    )
+
+
 def set_completed(
     db_session_factory: Callable[[], Session],
     media_file_id: int,
