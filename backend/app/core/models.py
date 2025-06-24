@@ -20,6 +20,7 @@ class MediaFile(SQLModel, table=True):
     """
     代表一个被扫描到的媒体文件及其处理状态。
     """
+    __table_args__ = {"extend_existing": True}
     # 基础信息
     id: Optional[int] = Field(default=None, primary_key=True)
     created_at: datetime.datetime = Field(default_factory=utc_now, nullable=False)
@@ -77,6 +78,7 @@ class ConfigItem(SQLModel, table=True):
     存储应用配置项的数据库模型。
     支持动态配置管理，配置值以JSON格式存储，支持复杂数据结构。
     """
+    __table_args__ = {"extend_existing": True}
     # 配置项的唯一标识符，作为主键
     key: str = Field(primary_key=True, nullable=False, description="配置项的唯一键名")
     

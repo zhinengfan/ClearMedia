@@ -21,6 +21,108 @@ from ...config import Settings
 SCANNER_LOG_PREFIX = "[Scanner]"
 
 
+def _parse_video_extensions(exts: str) -> set[str]:
+    """
+    解析视频扩展名字符串，返回标准化的扩展名集合。
+    
+    Args:
+        exts: 逗号分隔的扩展名字符串（如 "mp4,mkv,avi" 或 ".mp4, .mkv"）
+        
+    Returns:
+        set[str]: 标准化的扩展名集合，全部小写且以"."开头（如 {'.mp4', '.mkv', '.avi'}）
+    """
+    if not exts:
+        return set()
+    
+    result = set()
+    for part in exts.split(','):
+        part = part.strip().lower()
+        if part:  # 跳过空字符串
+            if not part.startswith('.'):
+                part = f'.{part}'
+            result.add(part)
+    
+    return result
+
+
+def _validate_file(
+    file_path: Path,
+    allowed_extensions: set[str],
+    *,
+    min_size_bytes: int
+) -> tuple[bool, str]:
+    """
+    验证文件是否符合扩展名和大小要求。
+    
+    Args:
+        file_path: 要验证的文件路径
+        allowed_extensions: 允许的扩展名集合（如 {'.mp4', '.mkv'}）
+        min_size_bytes: 最小文件大小（字节），0表示不检查大小
+        
+    Returns:
+        tuple[bool, str]: (是否有效, 失败原因)
+    """
+    # 检查文件扩展名
+    file_extension = file_path.suffix.lower()
+    if file_extension not in allowed_extensions:
+        return False, f"扩展名 {file_extension} 不在允许列表中"
+    
+    # 获取文件信息
+    try:
+        stat_info = file_path.stat()
+    except OSError:
+        return False, "无法获取文件信息"
+    
+    # 检查文件大小（仅当 min_size_bytes > 0 时）
+    if min_size_bytes > 0 and stat_info.st_size < min_size_bytes:
+        return False, f"文件大小 {stat_info.st_size} 字节小于最小要求 {min_size_bytes} 字节"
+    
+    return True, ""
+
+
+def _process_single_file(
+    db_session: Session,
+    file_path: Path
+) -> int | None:
+    """
+    处理单个文件，将其添加到数据库中（如果不存在）。
+    
+    Args:
+        db_session: 数据库会话
+        file_path: 要处理的文件路径
+        
+    Returns:
+        int | None: 成功创建新记录时返回文件ID，其他情况返回None
+    """
+    # 获取文件的统计信息
+    try:
+        stat_info = file_path.stat()
+    except OSError:
+        return None
+    
+    inode = stat_info.st_ino
+    device_id = stat_info.st_dev
+    
+    # 检查文件是否已存在于数据库中
+    try:
+        existing_media_file = crud.get_media_file_by_inode_device(
+            db_session, inode, device_id
+        )
+    except Exception:
+        return None
+    
+    # 如果文件已存在，返回None
+    if existing_media_file is not None:
+        return None
+    
+    # 如果文件不存在于数据库中，创建新记录
+    try:
+        new_media_file = crud.create_media_file(db_session, file_path)
+        return new_media_file.id
+    except Exception:
+        return None
+
+
 def _log_scan_error(e: OSError):
     """os.walk的错误回调函数，仅记录错误并继续"""
     logger.warning(f"{SCANNER_LOG_PREFIX} 扫描时访问路径失败，已跳过: {e}")
@@ -63,7 +165,7 @@ def scan_directory_once(
         )
 
         for dirpath, dirnames, filenames in walk_iterator:
-            # 建议2: 跳过目标目录以提高效率
+            # 跳过目标目录以提高效率
             # 使用resolve()确保路径是绝对的，然后用字符串比较
             if settings.SCAN_EXCLUDE_TARGET_DIR and str(Path(dirpath).resolve()).startswith(target_dir_abs):
                 logger.trace(f"{SCANNER_LOG_PREFIX} 跳过目标目录及其子目录: {dirpath}")
@@ -75,46 +177,25 @@ def scan_directory_once(
                 files_found += 1
                 file_path = Path(dirpath) / filename
             
-                # 检查文件扩展名是否在允许列表中
-                if file_path.suffix.lower() not in allowed_extensions:
-                    logger.trace(f"{SCANNER_LOG_PREFIX} 跳过非媒体文件: {file_path.name}")
+                # 使用工具函数验证文件
+                is_valid, reason = _validate_file(
+                    file_path, 
+                    allowed_extensions, 
+                    min_size_bytes=min_file_size_bytes
+                )
+                
+                if not is_valid:
+                    logger.trace(f"{SCANNER_LOG_PREFIX} 跳过文件 {file_path.name}: {reason}")
                     continue
                 
-                # 获取文件的统计信息用于后续检查
-                try:
-                    stat_info = file_path.stat()
-                except OSError as e:
-                    logger.error(f"{SCANNER_LOG_PREFIX} 无法获取文件信息 {file_path}: {e}")
-                    continue
-
-                # 建议5: 检查文件大小
-                if settings.MIN_FILE_SIZE_MB > 0 and stat_info.st_size < min_file_size_bytes:
-                    logger.trace(f"{SCANNER_LOG_PREFIX} 跳过小文件 (<{settings.MIN_FILE_SIZE_MB}MB): {file_path.name}")
-                    continue
-                    
-                inode = stat_info.st_ino
-                device_id = stat_info.st_dev
+                # 使用工具函数处理文件
+                new_file_id = _process_single_file(db_session, file_path)
                 
-                # 检查文件是否已存在于数据库中
-                try:
-                    existing_media_file = crud.get_media_file_by_inode_device(
-                        db_session, inode, device_id
-                    )
-                except Exception as e:
-                    logger.error(f"{SCANNER_LOG_PREFIX} 数据库查询失败 {file_path}: {e}")
-                    continue
-                
-                # 如果文件不存在于数据库中，创建新记录
-                if existing_media_file is None:
-                    try:
-                        new_media_file = crud.create_media_file(db_session, file_path)
-                        new_file_ids.append(new_media_file.id)
-                        logger.info(f"{SCANNER_LOG_PREFIX} 新增媒体文件: {file_path.name} (ID: {new_media_file.id})")
-                    except Exception as e:
-                        logger.error(f"{SCANNER_LOG_PREFIX} 创建媒体文件记录失败 {file_path}: {e}")
-                        continue
+                if new_file_id is not None:
+                    new_file_ids.append(new_file_id)
+                    logger.info(f"{SCANNER_LOG_PREFIX} 新增媒体文件: {file_path.name} (ID: {new_file_id})")
                 else:
-                    logger.trace(f"{SCANNER_LOG_PREFIX} 文件已存在于数据库: {file_path.name}")
+                    logger.trace(f"{SCANNER_LOG_PREFIX} 文件已存在于数据库或处理失败: {file_path.name}")
         
         logger.debug(
             f"{SCANNER_LOG_PREFIX} 扫描完成 - 总文件: {files_found}, "
@@ -153,7 +234,7 @@ async def background_scanner_task(
     )
     
     # 使用配置中的视频文件扩展名
-    allowed_extensions = set(ext.strip() for ext in settings.VIDEO_EXTENSIONS.split(',') if ext.strip())
+    allowed_extensions = _parse_video_extensions(settings.VIDEO_EXTENSIONS)
     scan_count = 0
     
     try:
@@ -190,17 +271,8 @@ async def background_scanner_task(
             except Exception as e:
                 logger.error(f"{SCANNER_LOG_PREFIX} 第 {scan_count} 次扫描失败: {e}")
             
-            # 等待指定间隔或停止事件
-            try:
-                await asyncio.wait_for(
-                    stop_event.wait(),
-                    timeout=settings.SCAN_INTERVAL_SECONDS,
-                )
-                # 如果 stop_event 被设置，退出循环
-                break
-            except asyncio.TimeoutError:
-                # 超时是正常的，继续下一次扫描
-                continue
+            # 等待指定间隔，同时检查停止事件
+            await asyncio.sleep(settings.SCAN_INTERVAL_SECONDS)
                 
     except asyncio.CancelledError:
         logger.info(f"{SCANNER_LOG_PREFIX} 后台扫描任务被取消")
