@@ -12,6 +12,8 @@ from app.services.media.scanner import background_scanner_task
 from app.services.media.producer import producer_loop
 from app.services.media.processor import process_media_file
 from app.services.media.status_manager import set_processing
+from sqlmodel import select
+from app.core.models import MediaFile, FileStatus
 
 # 配置日志
 logger.remove()
@@ -88,7 +90,44 @@ async def lifespan(app: FastAPI):
     cleanup_deprecated_configs()
     logger.info("废弃配置项清理完成")
     
+    # ------------------------------------------------------------------
+    # 1) 创建数据库会话工厂
+    # ------------------------------------------------------------------
     db_session_factory = get_session_factory()
+
+    # ------------------------------------------------------------------
+    # 2) 启动时恢复被意外中断的任务
+    #    将所有 QUEUED / PROCESSING 状态的任务重置为 PENDING，
+    #    防止服务重启后出现"卡单"现象
+    # ------------------------------------------------------------------
+
+    async def _recover_stuck_tasks() -> int:
+        """在独立线程里执行恢复逻辑，返回受影响记录数"""
+
+        def _sync_recover() -> int:
+            with db_session_factory() as session:
+                stuck_tasks = session.exec(
+                    select(MediaFile).where(
+                        MediaFile.status.in_([FileStatus.QUEUED, FileStatus.PROCESSING])
+                    )
+                ).all()
+
+                if not stuck_tasks:
+                    return 0
+
+                for task in stuck_tasks:
+                    task.status = FileStatus.PENDING
+
+                session.commit()
+                return len(stuck_tasks)
+
+        return await asyncio.to_thread(_sync_recover)
+
+    recovered = await _recover_stuck_tasks()
+    if recovered:
+        logger.warning(f"启动恢复: 已将 {recovered} 个卡住任务重置为 PENDING")
+    else:
+        logger.info("启动恢复: 未发现卡住任务")
     
     # 创建共享队列
     media_file_queue: asyncio.Queue[int] = asyncio.Queue()
