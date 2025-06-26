@@ -15,6 +15,8 @@ When running backend python environment tests, you need to run it in the root di
 # Coding pattern preferences
 
 - 代码编写过程中,模块中导入本地代码一定要使用相对路径,如"from ..config import setting".
+- 不采用降级依赖包来满足兼容性, 最新的依赖使用示例必须查询context7 mcp
+- 不要试图绕过问题,遇到问题先使用,sequential-thinking工具思考根因,在规划解决方法
 - Avoid duplication of code whenever possible, which means checking for other areas of the codebase that might already have similar code and functionality
 - You are careful to only make changes that are requested or you are confident are well understood and related to the change being requested
 - When fixing an issue or bug, do not introduce a new pattern or technology without first exhausting all options for the existing implementation. And if you finally do this, make sure to remove the old implementation afterwards so we don't have duplicate logic.
@@ -25,5 +27,5 @@ When running backend python environment tests, you need to run it in the root di
 
 # MCP use
 - Always use mcp-deepwiki for project architecture/dependencies
-- Always use context7 mcp tools with version for API/code examples
+- Always use context7 mcp tools with version for API/code examples,fix error and version problems.
 - Never write code from memory

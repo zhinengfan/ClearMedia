@@ -264,14 +264,4 @@
 
 
 
-设计上确实可以彻底把「发现（生产）」和「处理（消费）」解耦，核心改动思路如下。
-1. 角色职责重新划分
-1) scanner 任务（Producer-A）
-纯粹负责 OS 目录递归 → 入库，所有新文件都设为 PENDING，不再把 ID 放入队列。
-2) producer 任务（Producer-B）
-以固定间隔（如 N 秒）轮询数据库，按「入库顺序 / id 递增」选出可处理的记录并放入队列。
-将其状态从 PENDING → QUEUED（新增枚举值）以避免重复投递。
-也可选择把 FAILED / NO_MATCH / CONFLICT 且标记为“可重试”的数据再次投递。
-3) worker 任务（Consumer）
-与现在相同：await queue.get() → process_media_file()
-取到 ID 后立即把状态从 QUEUED → PROCESSING。
+---
