@@ -108,17 +108,18 @@ export function RecentActivities() {
     fetchRecentFiles();
   }, []);
 
-  const handleRowClick = () => {
-    // 使用 TanStack Router 导航到 Files 页面
+  const handleRowClick = (fileId: number) => {
     navigate({
       to: '/media',
-      search: {
+      search: (prev) => ({
+        ...prev,
         skip: 0,
         limit: 20,
         status: '',
         search: '',
         sort: 'created_at:desc',
-      },
+        details: fileId,
+      }),
     });
   };
 
@@ -180,7 +181,7 @@ export function RecentActivities() {
                 <TableRow
                   key={file.id}
                   className="cursor-pointer hover:bg-gray-50"
-                  onClick={handleRowClick}
+                  onClick={() => handleRowClick(file.id)}
                 >
                   <TableCell className="font-medium">
                     <div

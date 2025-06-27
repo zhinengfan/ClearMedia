@@ -296,9 +296,14 @@ export function Files() {
 
   // 处理详情面板关闭
   const handleDetailsClose = React.useCallback(() => {
-    // 简化关闭逻辑，刷新页面
-    window.location.reload();
-  }, []);
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        details: undefined,
+      }),
+      replace: true,
+    });
+  }, [navigate]);
 
   // 处理批量重试
   const handleBatchRetry = React.useCallback(async () => {
