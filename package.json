@@ -10,10 +10,12 @@
     "prepare": "husky",
     "dev": "pnpm --filter frontend dev",
     "build": "pnpm --filter frontend build",
-    "preview": "pnpm --filter frontend preview"
+    "preview": "pnpm --filter frontend preview",
+    "gen:api-types": "openapi-typescript http://localhost:8000/openapi.json -o frontend/src/types/openapi.d.ts && pnpm --filter frontend format"
   },
   "packageManager": "pnpm@10.11.1+sha512.e519b9f7639869dc8d5c3c5dfef73b3f091094b0a006d7317353c72b124e80e1afd429732e28705ad6bfa1ee879c1fce46c128ccebd3192101f43dd67c667912",
   "devDependencies": {
-    "husky": "^9.1.7"
+    "husky": "^9.1.7",
+    "openapi-typescript": "^7.8.0"
   }
 }

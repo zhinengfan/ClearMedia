@@ -1,76 +1,38 @@
 import {
-  Outlet,
-  Link,
   createRootRoute,
   createRoute,
   createRouter,
 } from '@tanstack/react-router';
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
+import Dashboard from './pages/Dashboard';
+import Files from './pages/Files';
+import Settings from './pages/Settings';
+import RootLayout from './layouts/RootLayout';
 
 // 创建根路由
 const rootRoute = createRootRoute({
-  component: () => (
-    <>
-      <div className="p-2 flex gap-2 text-lg border-b">
-        <Link
-          to="/"
-          activeProps={{
-            className: 'font-bold',
-          }}
-          activeOptions={{ exact: true }}
-        >
-          首页
-        </Link>{' '}
-        <Link
-          to="/media"
-          activeProps={{
-            className: 'font-bold',
-          }}
-        >
-          媒体管理
-        </Link>{' '}
-        <Link
-          to="/settings"
-          activeProps={{
-            className: 'font-bold',
-          }}
-        >
-          系统设置
-        </Link>
-      </div>
-      <Outlet />
-      <TanStackRouterDevtools />
-    </>
-  ),
+  component: RootLayout,
 });
 
 // 创建首页路由
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: function Index() {
-    return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-secondary-900 mb-4">
-          Dashboard
-        </h1>
-        <p className="text-secondary-600">欢迎使用媒体管理系统</p>
-      </div>
-    );
-  },
+  component: Dashboard,
 });
 
 // 创建媒体管理路由
 const mediaRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/media',
-  component: function Media() {
-    return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-secondary-900 mb-4">媒体管理</h1>
-        <p className="text-secondary-600">管理您的媒体文件</p>
-      </div>
-    );
+  component: Files,
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      skip: Number(search?.skip) || 0,
+      limit: Number(search?.limit) || 20,
+      status: (search?.status as string) || '',
+      search: (search?.search as string) || '',
+      sort: (search?.sort as string) || 'created_at:desc',
+    };
   },
 });
 
@@ -78,14 +40,7 @@ const mediaRoute = createRoute({
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
-  component: function Settings() {
-    return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-secondary-900 mb-4">系统设置</h1>
-        <p className="text-secondary-600">配置系统参数</p>
-      </div>
-    );
-  },
+  component: Settings,
 });
 
 // 创建路由树

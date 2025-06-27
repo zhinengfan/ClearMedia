@@ -5,18 +5,18 @@
 
 /* Design tokens using @theme directive for TailwindCSS v4 */
 @theme {
-  /* Primary color palette - Blue */
-  --color-primary-50: #f0f9ff;
-  --color-primary-100: #e0f2fe;
-  --color-primary-200: #bae6fd;
-  --color-primary-300: #7dd3fc;
-  --color-primary-400: #38bdf8;
-  --color-primary-500: #0ea5e9;
-  --color-primary-600: #0284c7;
-  --color-primary-700: #0369a1;
-  --color-primary-800: #075985;
-  --color-primary-900: #0c4a6e;
-  --color-primary-950: #082f49;
+  /* Primary color palette - Emerald (Brand Green) */
+  --color-primary-50: #f0fdf4;
+  --color-primary-100: #dcfce7;
+  --color-primary-200: #bbf7d0;
+  --color-primary-300: #86efac;
+  --color-primary-400: #4ade80;
+  --color-primary-500: #22c55e; /* Brand Green */
+  --color-primary-600: #16a34a;
+  --color-primary-700: #15803d;
+  --color-primary-800: #166534;
+  --color-primary-900: #14532d;
+  --color-primary-950: #052e16;
 
   /* Secondary color palette - Slate */
   --color-secondary-50: #f8fafc;
@@ -31,18 +31,18 @@
   --color-secondary-900: #0f172a;
   --color-secondary-950: #020617;
 
-  /* Success color palette - Green */
-  --color-success-50: #f0fdf4;
-  --color-success-100: #dcfce7;
-  --color-success-200: #bbf7d0;
-  --color-success-300: #86efac;
-  --color-success-400: #4ade80;
-  --color-success-500: #22c55e;
-  --color-success-600: #16a34a;
-  --color-success-700: #15803d;
-  --color-success-800: #166534;
-  --color-success-900: #14532d;
-  --color-success-950: #052e16;
+  /* Success color palette - Blue (formerly primary) */
+  --color-success-50: #f0f9ff;
+  --color-success-100: #e0f2fe;
+  --color-success-200: #bae6fd;
+  --color-success-300: #7dd3fc;
+  --color-success-400: #38bdf8;
+  --color-success-500: #0ea5e9;
+  --color-success-600: #0284c7;
+  --color-success-700: #0369a1;
+  --color-success-800: #075985;
+  --color-success-900: #0c4a6e;
+  --color-success-950: #082f49;
 
   /* Warning color palette - Amber */
   --color-warning-50: #fffbeb;
@@ -118,6 +118,42 @@
   .btn-secondary {
     @apply bg-secondary-100 hover:bg-secondary-200 text-secondary-700 font-medium py-2 px-4 rounded-lg transition-colors;
   }
+
+  .text-muted {
+    @apply text-secondary-600;
+  }
+
+  .text-subtle {
+    @apply text-secondary-500;
+  }
+
+  .surface {
+    @apply bg-secondary-50;
+  }
+
+  .border-default {
+    @apply border-secondary-200;
+  }
+
+  .nav-item {
+    @apply flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors duration-200;
+  }
+
+  .nav-item-active {
+    @apply bg-primary-50 text-primary-700 font-medium;
+  }
+
+  .nav-item-inactive {
+    @apply text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900;
+  }
+
+  .card {
+    @apply bg-white p-6 rounded-lg shadow;
+  }
+
+  .input-default {
+    @apply mt-1 block w-full px-3 py-2 border border-secondary-300 rounded-md shadow-sm placeholder-secondary-400 focus:border-primary-500 focus:ring-primary-500;
+  }
 }
 
 @theme inline {
@@ -167,8 +203,8 @@
   --card-foreground: #0f172a;
   --popover: #ffffff;
   --popover-foreground: #0f172a;
-  --primary: #0ea5e9;
-  --primary-foreground: #ffffff;
+  --primary: #22c55e;
+  --primary-foreground: #082f49;
   --secondary: #f1f5f9;
   --secondary-foreground: #334155;
   --muted: #f1f5f9;
@@ -178,7 +214,7 @@
   --destructive: #ef4444;
   --border: #e2e8f0;
   --input: #e2e8f0;
-  --ring: #0ea5e9;
+  --ring: #22c55e;
   --chart-1: #0ea5e9;
   --chart-2: #22c55e;
   --chart-3: #f59e0b;
@@ -186,12 +222,12 @@
   --chart-5: #8b5cf6;
   --sidebar: #ffffff;
   --sidebar-foreground: #0f172a;
-  --sidebar-primary: #0ea5e9;
+  --sidebar-primary: #22c55e;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #f1f5f9;
   --sidebar-accent-foreground: #334155;
   --sidebar-border: #e2e8f0;
-  --sidebar-ring: #0ea5e9;
+  --sidebar-ring: #22c55e;
 }
 
 .dark {
@@ -221,7 +257,7 @@
   --chart-5: #a78bfa;
   --sidebar: #1e293b;
   --sidebar-foreground: #f8fafc;
-  --sidebar-primary: #38bdf8;
+  --sidebar-primary: #22c55e;
   --sidebar-primary-foreground: #082f49;
   --sidebar-accent: #334155;
   --sidebar-accent-foreground: #f1f5f9;

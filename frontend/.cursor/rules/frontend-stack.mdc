@@ -1,0 +1,31 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+| 类别 | 技术/库 | 版本 (当前 `package.json`) | 主要作用 |
+| --- | --- | --- | --- |
+| 核心运行时 | React | ^19.1.0 | 视图库；采用函数组件 + Hooks |
+|  | TypeScript | ~5.8.3 | 静态类型系统，启用严格模式 |
+| 构建工具 | Vite | ^7.0.0 | 极速本地开发 & 生产打包 |
+|  | pnpm Workspace | ≥10 | Monorepo 依赖管理 |
+| 路由 | @tanstack/react-router | ^1.121.34 | 类型安全的前端路由；配合 Devtools |
+| UI 与样式 | Tailwind CSS | ^4.1.10 | Utility-first CSS；结合 CSS 变量做 Design Token |
+|  | shadcn/ui (Radix UI + CVA) | — | 通用无样式组件，配合 Tailwind 快速定制 |
+|  | class-variance-authority | ^0.7.1 | Tailwind 样式变体管理 |
+|  | tailwind-merge | ^3.3.1 | 合并冲突的原子类 |
+|  | clsx | ^2.1.1 | 条件 className 拼接 |
+| 图表 | Recharts | ^3.0.1 | 可组合式图表库（StatusPie 等组件） |
+| API & 类型 | openapi-typescript | cli | 根据 FastAPI OpenAPI 自动生成前端类型定义 |
+| 质量工具 | ESLint + @typescript-eslint | ^9.29.0 / ^8.34.1 | 代码静态检查 |
+|  | Prettier | ^3.6.1 | 代码格式化 |
+|  | Husky + lint-staged | ^9.1.7 / ^16.1.2 | 提交前自动 Lint & 格式化 |
+| Vite 插件 | @vitejs/plugin-react | ^4.5.2 | React Fast Refresh / JSX 处理 |
+|  | @tailwindcss/vite | ^4.1.10 | Tailwind JIT 与 Vite 集成 |
+| 开发辅助 | TanStack Router Devtools | — | 路由可视化调试面板 |
+|  | lucide-react | ^0.523.0 | 图标库 |
+|  | tw-animate-css | ^1.3.4 | Tailwind 动画快捷类 |
+
+> 备注  
+> • 版本以 `frontend/package.json` 为准；符号 `^` 表示兼容最新次版本。  
+> • 表中 “—” 表示非 npm 单独版本或由多包组合。

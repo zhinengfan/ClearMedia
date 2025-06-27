@@ -41,7 +41,7 @@ def mock_queue_fixture():
 def client_fixture(session: Session, mock_queue, env_vars):
     """创建测试客户端，使用测试数据库和模拟队列"""
     # 延迟导入app，确保env_vars已设置
-    from main import app  # noqa: WPS433
+    from main import app
 
     def get_db_override():
         yield session
@@ -199,14 +199,80 @@ class TestMediaFilesAPI:
         assert data["items"][0]["status"] == FileStatus.NO_MATCH
 
     def test_get_files_with_queued_status(self, client: TestClient, sample_media_files):
-        """测试查询QUEUED状态的文件"""
+        """测试QUEUED状态筛选"""
         response = client.get(f"/api/files?status={FileStatus.QUEUED}")
         assert response.status_code == 200
         
         data = response.json()
-        assert data["total"] == 1
+        assert data["total"] == 1  # 现在包含一个QUEUED状态文件
         assert len(data["items"]) == 1
         assert data["items"][0]["status"] == FileStatus.QUEUED
+    
+    def test_get_files_with_multiple_statuses(self, client: TestClient, sample_media_files):
+        """测试多状态筛选（逗号分隔）"""
+        response = client.get(f"/api/files?status={FileStatus.PENDING},{FileStatus.COMPLETED}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 2  # PENDING 和 COMPLETED 各有一个
+        assert len(data["items"]) == 2
+        
+        # 验证返回的都是指定状态
+        returned_statuses = {item["status"] for item in data["items"]}
+        assert returned_statuses == {FileStatus.PENDING, FileStatus.COMPLETED}
+    
+    def test_get_files_with_all_statuses(self, client: TestClient, sample_media_files):
+        """测试筛选所有状态"""
+        all_statuses = f"{FileStatus.PENDING},{FileStatus.QUEUED},{FileStatus.PROCESSING},{FileStatus.COMPLETED},{FileStatus.FAILED},{FileStatus.CONFLICT},{FileStatus.NO_MATCH}"
+        response = client.get(f"/api/files?status={all_statuses}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 6  # 所有6个测试文件
+        assert len(data["items"]) == 6
+    
+    def test_get_files_with_status_case_insensitive(self, client: TestClient, sample_media_files):
+        """测试状态筛选不区分大小写"""
+        response = client.get("/api/files?status=pending,completed")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 2  # PENDING 和 COMPLETED 各有一个
+        assert len(data["items"]) == 2
+        
+        # 验证返回的都是指定状态（大写）
+        returned_statuses = {item["status"] for item in data["items"]}
+        assert returned_statuses == {FileStatus.PENDING, FileStatus.COMPLETED}
+    
+    def test_get_files_with_duplicate_statuses(self, client: TestClient, sample_media_files):
+        """测试重复状态自动去重"""
+        response = client.get(f"/api/files?status={FileStatus.PENDING},{FileStatus.PENDING},{FileStatus.COMPLETED}")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["total"] == 2  # 应该去重，只返回 PENDING 和 COMPLETED
+        assert len(data["items"]) == 2
+        
+        returned_statuses = {item["status"] for item in data["items"]}
+        assert returned_statuses == {FileStatus.PENDING, FileStatus.COMPLETED}
+    
+    def test_get_files_with_empty_status_values(self, client: TestClient, sample_media_files):
+        """测试空状态值和空白状态值"""
+        # 测试完全空的状态参数
+        response = client.get("/api/files?status=")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 6  # 应该返回所有文件
+        
+        # 测试包含空白的状态参数
+        response = client.get(f"/api/files?status=,{FileStatus.PENDING}, ,{FileStatus.COMPLETED},")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2  # 应该只返回有效的 PENDING 和 COMPLETED
+        assert len(data["items"]) == 2
+        
+        returned_statuses = {item["status"] for item in data["items"]}
+        assert returned_statuses == {FileStatus.PENDING, FileStatus.COMPLETED}
     
     def test_get_files_invalid_status(self, client: TestClient, sample_media_files):
         """测试无效状态值"""
@@ -214,7 +280,17 @@ class TestMediaFilesAPI:
         assert response.status_code == 422
         
         data = response.json()
-        assert "无效的状态值" in data["detail"]
+        assert "不支持的状态值" in data["detail"]
+        assert "INVALID_STATUS" in data["detail"]
+    
+    def test_get_files_mixed_valid_invalid_statuses(self, client: TestClient, sample_media_files):
+        """测试混合有效和无效状态值"""
+        response = client.get(f"/api/files?status={FileStatus.PENDING},INVALID_STATUS,{FileStatus.COMPLETED}")
+        assert response.status_code == 422
+        
+        data = response.json()
+        assert "不支持的状态值" in data["detail"]
+        assert "INVALID_STATUS" in data["detail"]
     
     def test_get_files_limit_too_large(self, client: TestClient, sample_media_files):
         """测试超出最大limit限制"""
@@ -358,6 +434,141 @@ class TestMediaFilesAPI:
         response = client.get("/api/files?sort=invalid_sort")
         assert response.status_code == 422
     
+    def test_get_files_sort_original_filename_asc(self, client: TestClient, sample_media_files):
+        """测试按文件名升序排序"""
+        response = client.get("/api/files?sort=original_filename:asc")
+        assert response.status_code == 200
+        
+        data = response.json()
+        items = data["items"]
+        
+        # 验证文件名是按字母升序排列的
+        if len(items) > 1:
+            for i in range(len(items) - 1):
+                current_name = items[i]["original_filename"].lower()
+                next_name = items[i + 1]["original_filename"].lower()
+                assert current_name <= next_name
+    
+    def test_get_files_sort_original_filename_desc(self, client: TestClient, sample_media_files):
+        """测试按文件名降序排序"""
+        response = client.get("/api/files?sort=original_filename:desc")
+        assert response.status_code == 200
+        
+        data = response.json()
+        items = data["items"]
+        
+        # 验证文件名是按字母降序排列的
+        if len(items) > 1:
+            for i in range(len(items) - 1):
+                current_name = items[i]["original_filename"].lower()
+                next_name = items[i + 1]["original_filename"].lower()
+                assert current_name >= next_name
+    
+    def test_get_files_sort_status_asc(self, client: TestClient, sample_media_files):
+        """测试按状态升序排序"""
+        response = client.get("/api/files?sort=status:asc")
+        assert response.status_code == 200
+        
+        data = response.json()
+        items = data["items"]
+        
+        # 验证状态是按字母升序排列的
+        if len(items) > 1:
+            for i in range(len(items) - 1):
+                current_status = items[i]["status"]
+                next_status = items[i + 1]["status"]
+                assert current_status <= next_status
+    
+    def test_get_files_sort_status_desc(self, client: TestClient, sample_media_files):
+        """测试按状态降序排序"""
+        response = client.get("/api/files?sort=status:desc")
+        assert response.status_code == 200
+        
+        data = response.json()
+        items = data["items"]
+        
+        # 验证状态是按字母降序排列的
+        if len(items) > 1:
+            for i in range(len(items) - 1):
+                current_status = items[i]["status"]
+                next_status = items[i + 1]["status"]
+                assert current_status >= next_status
+    
+    def test_get_files_sort_updated_at_asc(self, client: TestClient, sample_media_files):
+        """测试按更新时间升序排序"""
+        response = client.get("/api/files?sort=updated_at:asc")
+        assert response.status_code == 200
+        
+        data = response.json()
+        items = data["items"]
+        
+        # 验证更新时间是升序的
+        if len(items) > 1:
+            for i in range(len(items) - 1):
+                current_time = items[i]["updated_at"]
+                next_time = items[i + 1]["updated_at"]
+                assert current_time <= next_time
+    
+    def test_get_files_sort_updated_at_desc(self, client: TestClient, sample_media_files):
+        """测试按更新时间降序排序"""
+        response = client.get("/api/files?sort=updated_at:desc")
+        assert response.status_code == 200
+        
+        data = response.json()
+        items = data["items"]
+        
+        # 验证更新时间是降序的
+        if len(items) > 1:
+            for i in range(len(items) - 1):
+                current_time = items[i]["updated_at"]
+                next_time = items[i + 1]["updated_at"]
+                assert current_time >= next_time
+    
+    def test_get_files_sort_invalid_field(self, client: TestClient, sample_media_files):
+        """测试无效的排序字段"""
+        response = client.get("/api/files?sort=invalid_field:asc")
+        assert response.status_code == 422
+        
+        data = response.json()
+        assert "不支持的排序字段" in data["detail"]
+        assert "invalid_field" in data["detail"]
+        assert "created_at, updated_at, original_filename, status" in data["detail"]
+    
+    def test_get_files_sort_invalid_direction(self, client: TestClient, sample_media_files):
+        """测试无效的排序方向"""
+        response = client.get("/api/files?sort=created_at:invalid")
+        assert response.status_code == 422
+        
+        data = response.json()
+        assert "不支持的排序方向" in data["detail"]
+        assert "invalid" in data["detail"]
+        assert "asc, desc" in data["detail"]
+    
+    def test_get_files_sort_malformed_parameter(self, client: TestClient, sample_media_files):
+        """测试格式错误的排序参数"""
+        # 测试缺少冒号分隔符
+        response = client.get("/api/files?sort=created_at_asc")
+        assert response.status_code == 422
+        
+        data = response.json()
+        assert "排序参数格式错误" in data["detail"]
+        assert "field:direction" in data["detail"]
+    
+    def test_get_files_sort_empty_parameter(self, client: TestClient, sample_media_files):
+        """测试空的排序参数"""
+        response = client.get("/api/files?sort=")
+        assert response.status_code == 200
+        
+        # 空参数应该使用默认排序（created_at:desc）
+        data = response.json()
+        items = data["items"]
+        
+        if len(items) > 1:
+            for i in range(len(items) - 1):
+                current_time = items[i]["created_at"]
+                next_time = items[i + 1]["created_at"]
+                assert current_time >= next_time
+
     def test_get_files_search_and_status_filter(self, client: TestClient, sample_media_files):
         """测试搜索和状态筛选组合"""
         response = client.get(f"/api/files?search=movie&status={FileStatus.PENDING}")
@@ -398,6 +609,78 @@ class TestMediaFilesAPI:
                 current_time = items[i]["created_at"]
                 next_time = items[i + 1]["created_at"]
                 assert current_time <= next_time
+
+    def test_get_files_has_next_true(self, client: TestClient, sample_media_files):
+        """测试 has_next 为 true 的情况"""
+        # 设置 skip=0, limit=3，应该有 has_next=true（因为总共有6个文件）
+        response = client.get("/api/files?skip=0&limit=3")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["skip"] == 0
+        assert data["limit"] == 3
+        assert data["has_next"]
+        assert not data["has_previous"]
+        assert data["total"] == 6  # sample_media_files 包含6个文件
+
+    def test_get_files_has_next_false(self, client: TestClient, sample_media_files):
+        """测试 has_next 为 false 的情况"""
+        # 设置 skip=3, limit=5，应该有 has_next=false（3+5>=6）
+        response = client.get("/api/files?skip=3&limit=5")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["skip"] == 3
+        assert data["limit"] == 5
+        assert not data["has_next"]
+        assert data["has_previous"]
+
+    def test_get_files_has_previous_true(self, client: TestClient, sample_media_files):
+        """测试 has_previous 为 true 的情况"""
+        # 设置 skip=2，应该有 has_previous=true
+        response = client.get("/api/files?skip=2&limit=2")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["skip"] == 2
+        assert data["limit"] == 2
+        assert data["has_previous"]
+
+    def test_get_files_has_previous_false(self, client: TestClient, sample_media_files):
+        """测试 has_previous 为 false 的情况"""
+        # 设置 skip=0，应该有 has_previous=false
+        response = client.get("/api/files?skip=0&limit=10")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["skip"] == 0
+        assert not data["has_previous"]
+
+    def test_get_files_pagination_boundary_conditions(self, client: TestClient, sample_media_files):
+        """测试分页边界条件"""
+        # 测试最后一页的完整情况
+        response = client.get("/api/files?skip=5&limit=1")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["skip"] == 5
+        assert data["limit"] == 1
+        assert not data["has_next"]  # 5+1 = 6 等于 total
+        assert data["has_previous"]  # skip > 0
+        assert len(data["items"]) == 1
+
+    def test_get_files_pagination_beyond_total(self, client: TestClient, sample_media_files):
+        """测试超出总数的分页情况"""
+        # skip 超出总数
+        response = client.get("/api/files?skip=10&limit=5")
+        assert response.status_code == 200
+        
+        data = response.json()
+        assert data["skip"] == 10
+        assert data["limit"] == 5
+        assert not data["has_next"]  # 10+5 > 6
+        assert data["has_previous"]  # skip > 0
+        assert len(data["items"]) == 0
 
 
 class TestMediaFileDetailAPI:
@@ -1035,7 +1318,7 @@ class TestAPIResponseStructure:
     def test_files_response_structure(self, client: TestClient, sample_media_files):
         resp = client.get("/api/files")
         data = resp.json()
-        assert set(data.keys()) == {"total", "skip", "limit", "items"}
+        assert set(data.keys()) == {"total", "skip", "limit", "has_next", "has_previous", "items"}
         if data["items"]:
             first = data["items"][0]
             required = {"id", "inode", "device_id", "original_filepath", "original_filename", "file_size", "status", "created_at", "updated_at"}
