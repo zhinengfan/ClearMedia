@@ -6,7 +6,7 @@ Pydantic模型（Schemas）模块
 """
 
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import datetime
 
 
@@ -70,4 +70,20 @@ class RetryResponse(BaseModel):
     message: str
     file_id: int
     previous_status: str
-    current_status: str 
+    current_status: str
+
+
+# 配置获取响应模型
+class ConfigGetResponse(BaseModel):
+    config: Dict[str, Any]
+    blacklist_keys: List[str]
+    message: str
+
+
+# 配置更新响应模型
+class ConfigUpdateResponse(BaseModel):
+    message: str
+    config: Dict[str, Any]
+    blacklist_keys: List[str]
+    updated_keys: Optional[List[str]] = None
+    rejected_keys: Optional[List[str]] = None 

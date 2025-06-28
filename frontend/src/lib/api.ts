@@ -27,6 +27,8 @@ export type FileSuggestResponse =
   paths['/api/files/suggest']['get']['responses'][200]['content']['application/json'];
 export type ConfigResponse =
   paths['/api/config']['get']['responses'][200]['content']['application/json'];
+export type ConfigUpdateResponse =
+  paths['/api/config']['post']['responses'][200]['content']['application/json'];
 
 // 查询参数类型
 export type GetFilesParams = paths['/api/files']['get']['parameters']['query'];
@@ -155,8 +157,8 @@ export async function getConfig(): Promise<ConfigResponse> {
  */
 export async function updateConfig(
   configUpdates: Record<string, unknown>
-): Promise<ConfigResponse> {
-  return request<ConfigResponse>('/api/config', {
+): Promise<ConfigUpdateResponse> {
+  return request<ConfigUpdateResponse>('/api/config', {
     method: 'POST',
     body: JSON.stringify(configUpdates),
   });

@@ -12,7 +12,7 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx}\"",
     "prepare": "husky install",
     "preview": "vite preview",
-    "gen:types": "openapi-typescript http://127.0.0.1:8000/openapi.json --output src/types/openapi.d.ts"
+    "gen:types": "openapi-typescript http://127.0.0.1:8000/openapi.json --output src/types/openapi.d.ts && pnpm format"
   },
   "dependencies": {
     "@mantine/core": "^8.1.2",

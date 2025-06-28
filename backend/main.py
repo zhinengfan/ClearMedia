@@ -26,6 +26,42 @@ logger.add(
 )
 
 
+async def _apply_settings_side_effects(settings_instance) -> None:
+    """
+    应用配置重载后的副作用处理
+    
+    这个函数处理配置更新后需要同步更新的全局状态，
+    从config.py中移到这里，让启动流程更清晰。
+    
+    Args:
+        settings_instance: 重新加载后的Settings实例
+    """
+    try:
+        # 更新 tmdbsimple API Key
+        import tmdbsimple
+        tmdbsimple.API_KEY = settings_instance.TMDB_API_KEY
+        logger.info("已更新 tmdbsimple.API_KEY")
+        
+        # 更新 tmdbsimple 语言设置
+        if hasattr(tmdbsimple, 'DEFAULT_LANGUAGE'):
+            tmdbsimple.DEFAULT_LANGUAGE = settings_instance.TMDB_LANGUAGE
+            logger.info(f"已更新 tmdbsimple.DEFAULT_LANGUAGE 为 {settings_instance.TMDB_LANGUAGE}")
+        
+        # 重新创建 TMDB_SEMAPHORE（需要更新tmdb.py中的全局变量）
+        try:
+            from app.core import tmdb
+            # 重新创建信号量
+            tmdb.TMDB_SEMAPHORE = asyncio.Semaphore(settings_instance.TMDB_CONCURRENCY)
+            logger.info(f"已更新 TMDB_SEMAPHORE 并发限制为 {settings_instance.TMDB_CONCURRENCY}")
+        except Exception as e:
+            logger.warning(f"更新 TMDB_SEMAPHORE 失败: {e}")
+        
+        logger.info("配置副作用处理完成")
+        
+    except Exception as e:
+        logger.error(f"执行配置副作用处理时出错: {e}")
+
+
 async def worker_loop(
     worker_id: int,
     queue: asyncio.Queue[int],
@@ -89,6 +125,20 @@ async def lifespan(app: FastAPI):
     logger.info("开始清理废弃配置项...")
     cleanup_deprecated_configs()
     logger.info("废弃配置项清理完成")
+    
+    # 🔧 修复：确保数据库配置正确加载
+    logger.info("重新加载配置以确保数据库配置生效...")
+    try:
+        from app.config import get_settings
+        updated_settings = get_settings(force_reload=True)
+        logger.info("配置重载成功，数据库配置已加载")
+        
+        # 应用配置后的副作用处理
+        await _apply_settings_side_effects(updated_settings)
+        
+    except Exception as e:
+        logger.error(f"配置重载失败，将使用默认配置: {e}")
+        # 继续启动，但使用默认配置
     
     # ------------------------------------------------------------------
     # 1) 创建数据库会话工厂

@@ -43,60 +43,45 @@ def _db_source(settings: BaseSettings) -> Dict[str, Any]:
     try:
         # 为避免循环依赖，直接查询数据库，不再通过 ConfigService
         from .db import get_session_factory
-        from .core.models import ConfigItem
-        from sqlmodel import select
-        import json
-        
+
         # 获取数据库会话
         session_factory = get_session_factory()
         with session_factory() as session:
-            # 直接查询ConfigItem表，避免ConfigService导入引起的循环依赖
-            config_items = session.exec(select(ConfigItem)).all()
-            config_dict = {}
-            for item in config_items:
-                try:
-                    config_dict[item.key] = json.loads(item.value)
-                except Exception:
-                    # 忽略反序列化错误
-                    continue
+            # 复用公共加载工具，保持解析逻辑一致
+            from .core.utils.config_loader import load_config_from_session
+
+            config_dict = load_config_from_session(session)
+
+            if config_dict:
+                logger.debug(
+                    f"从数据库加载了 {len(config_dict)} 个配置项: {list(config_dict.keys())}"
+                )
+            else:
+                logger.debug("数据库中没有找到配置项，使用默认配置")
+
             return config_dict
+            
+    except ImportError as e:
+        # 循环导入错误，这在启动早期是正常的
+        logger.debug(f"配置加载时发生循环导入（启动早期正常）: {e}")
+        return {}
     except Exception as e:
-        # 启动早期数据库可能尚未就绪或发生循环导入，此处仅记录调试日志，避免误导性的警告
-        logger.debug(f"从数据库加载配置失败，使用默认配置: {e}")
+        # 其他错误，可能是数据库连接问题
+        logger.warning(f"从数据库加载配置失败，使用默认配置: {e}")
         return {}
 
 
 def _on_settings_reloaded(settings: "Settings") -> None:
     """
-    配置重载钩子函数，处理配置更新后的全局副作用
+    配置重载钩子函数
+    
+    注意：副作用处理逻辑已移到main.py中的_apply_settings_side_effects函数，
+    这里只保留基本的重载通知。
     
     Args:
         settings: 重新加载后的Settings实例
     """
-    try:
-        # 更新 tmdbsimple API Key
-        tmdbsimple.API_KEY = settings.TMDB_API_KEY
-        logger.info("已更新 tmdbsimple.API_KEY")
-        
-        # 更新 tmdbsimple 语言设置
-        if hasattr(tmdbsimple, 'DEFAULT_LANGUAGE'):
-            tmdbsimple.DEFAULT_LANGUAGE = settings.TMDB_LANGUAGE
-            logger.info(f"已更新 tmdbsimple.DEFAULT_LANGUAGE 为 {settings.TMDB_LANGUAGE}")
-        
-        # 重新创建 TMDB_SEMAPHORE（需要更新tmdb.py中的全局变量）
-        # 注意：这里我们需要通知tmdb模块更新其SEMAPHORE
-        try:
-            from .core import tmdb
-            # 重新创建信号量
-            tmdb.TMDB_SEMAPHORE = asyncio.Semaphore(settings.TMDB_CONCURRENCY)
-            logger.info(f"已更新 TMDB_SEMAPHORE 并发限制为 {settings.TMDB_CONCURRENCY}")
-        except Exception as e:
-            logger.warning(f"更新 TMDB_SEMAPHORE 失败: {e}")
-        
-        logger.info("配置重载钩子执行完成")
-        
-    except Exception as e:
-        logger.error(f"执行配置重载钩子时出错: {e}")
+    logger.info("配置已重载，如需应用副作用请调用相应的处理函数")
 
 
 class Settings(BaseSettings):
@@ -204,6 +189,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = Field(
         default="*",
         description="允许跨域访问的源地址，逗号分隔格式，如: http://localhost:3000,https://example.com"
+    )
+
+    # —— 配置管理 ——
+    CONFIG_BLACKLIST: str = Field(
+        default="DATABASE_URL,ENABLE_TMDB,ENABLE_LLM",
+        description="不可配置的配置项黑名单，逗号分隔格式"
     )
 
     model_config = SettingsConfigDict(
@@ -341,9 +332,35 @@ class Settings(BaseSettings):
         
         return ','.join(validated_origins)
 
+    @field_validator("CONFIG_BLACKLIST")
+    @classmethod
+    def validate_config_blacklist(cls, v: str) -> str:
+        """验证配置黑名单格式"""
+        if not v:
+            raise ValueError("配置黑名单不能为空")
+        
+        # 分割配置项
+        config_keys = [key.strip() for key in v.split(',') if key.strip()]
+        
+        if not config_keys:
+            raise ValueError("配置黑名单列表不能为空")
+        
+        validated_keys = []
+        for key in config_keys:
+            # 验证配置项名称格式（只允许大写字母、数字和下划线）
+            if not key.replace('_', '').replace('-', '').isalnum() or not key.isupper():
+                raise ValueError(f"无效的配置项名称格式: {key}")
+            validated_keys.append(key)
+        
+        return ','.join(validated_keys)
+
     def get_cors_origins_list(self) -> list[str]:
         """获取CORS_ORIGINS的列表形式"""
         return self.CORS_ORIGINS.split(',')
+
+    def get_config_blacklist(self) -> set[str]:
+        """获取配置黑名单的集合形式"""
+        return set(key.strip() for key in self.CONFIG_BLACKLIST.split(',') if key.strip())
 
 
 # 全局单例

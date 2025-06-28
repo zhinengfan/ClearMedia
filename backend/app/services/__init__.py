@@ -5,7 +5,7 @@
 - media: 媒体文件处理和扫描服务
 """
 
-from .config import ConfigService, WRITABLE_CONFIG_KEYS, EXCLUDED_CONFIG_KEYS
+from .config import ConfigService
 from .media import (
     process_media_file, 
     ProcessResult, 
@@ -17,8 +17,6 @@ from .media import (
 __all__ = [
     # Config services
     "ConfigService", 
-    "WRITABLE_CONFIG_KEYS", 
-    "EXCLUDED_CONFIG_KEYS",
     # Media services
     "process_media_file", 
     "ProcessResult", 

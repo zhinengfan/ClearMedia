@@ -242,12 +242,13 @@ export interface paths {
      * @description 获取当前配置信息
      *
      *     返回当前系统的所有配置项，敏感字段（如API密钥）会进行脱敏处理。
+     *     同时返回配置黑名单列表。
      *
      *     Args:
      *         db: 数据库会话依赖
      *
      *     Returns:
-     *         dict: 包含所有配置项的字典，敏感字段已脱敏
+     *         ConfigGetResponse: 包含所有配置项的响应对象，敏感字段已脱敏
      */
     get: operations['get_config_api_config_get'];
     put?: never;
@@ -255,7 +256,7 @@ export interface paths {
      * Update Config
      * @description 更新配置项
      *
-     *     接收配置更新请求，仅允许更新白名单内的配置项。
+     *     接收配置更新请求，仅允许更新不在黑名单中的配置项。
      *     更新成功后会触发配置热重载。
      *
      *     Args:
@@ -263,7 +264,7 @@ export interface paths {
      *         db: 数据库会话依赖
      *
      *     Returns:
-     *         dict: 更新结果信息，包含更新后的配置
+     *         ConfigUpdateResponse: 更新结果信息，包含更新后的配置
      *
      *     Raises:
      *         HTTPException: 当配置验证失败或更新失败时
@@ -316,6 +317,32 @@ export interface components {
       success: boolean;
       /** Error */
       error?: string | null;
+    };
+    /** ConfigGetResponse */
+    ConfigGetResponse: {
+      /** Config */
+      config: {
+        [key: string]: unknown;
+      };
+      /** Blacklist Keys */
+      blacklist_keys: string[];
+      /** Message */
+      message: string;
+    };
+    /** ConfigUpdateResponse */
+    ConfigUpdateResponse: {
+      /** Message */
+      message: string;
+      /** Config */
+      config: {
+        [key: string]: unknown;
+      };
+      /** Blacklist Keys */
+      blacklist_keys: string[];
+      /** Updated Keys */
+      updated_keys?: string[] | null;
+      /** Rejected Keys */
+      rejected_keys?: string[] | null;
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -453,10 +480,10 @@ export interface operations {
         skip?: number;
         /** @description 返回的记录数限制（最大500） */
         limit?: number;
+        /** @description 按文件名模糊搜索 */
+        search?: string | null;
         /** @description 按状态筛选，支持多个状态用逗号分隔: PENDING, QUEUED, PROCESSING, COMPLETED, FAILED, CONFLICT, NO_MATCH */
         status?: string | null;
-        /** @description 按文件名或文件路径模糊搜索 */
-        search?: string | null;
         /** @description 排序方式，格式为 'field:direction'。支持字段: created_at, updated_at, original_filename, status。支持方向: asc, desc */
         sort?: string | null;
       };
@@ -685,7 +712,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': unknown;
+          'application/json': components['schemas']['ConfigGetResponse'];
         };
       };
     };
@@ -711,7 +738,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': unknown;
+          'application/json': components['schemas']['ConfigUpdateResponse'];
         };
       };
       /** @description Validation Error */

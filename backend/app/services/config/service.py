@@ -1,100 +1,63 @@
 """
 配置服务模块
 
-提供配置项的数据库CRUD操作，包括白名单验证、事务安全和Pydantic验证。
+提供配置项的数据库CRUD操作，包括动态黑名单验证、事务安全和Pydantic验证。
 支持动态配置管理，确保系统的健壮性和安全性。
 """
 
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Set
 from sqlmodel import Session, select
 from pydantic import ValidationError
 
 from ...core.models import ConfigItem
-from ...config import Settings
 
 
-# 定义可写配置项白名单 - 排除敏感和基础设施配置
-WRITABLE_CONFIG_KEYS = {
-    # OpenAI/LLM配置
-    "OPENAI_API_BASE",
-    "OPENAI_MODEL",
+def get_config_blacklist() -> Set[str]:
+    """
+    获取动态配置黑名单
     
-    # TMDB配置
-    "TMDB_LANGUAGE", 
-    "TMDB_CONCURRENCY",
-    
-    # 扫描与并发配置
-    "SCAN_INTERVAL_SECONDS",
-    "SCAN_EXCLUDE_TARGET_DIR", 
-    "SCAN_FOLLOW_SYMLINKS",
-    "MIN_FILE_SIZE_MB",
-    "VIDEO_EXTENSIONS",
-    
-    # 日志与环境配置
-    "LOG_LEVEL",
-    "APP_ENV",
-    
-    # 功能开关
-    "ENABLE_TMDB",
-    "ENABLE_LLM",
-    
-    # 队列与工作者
-    "WORKER_COUNT",
-    
-    # CORS配置
-    "CORS_ORIGINS",
-}
-
-# 明确排除的配置项（敏感或基础设施相关）
-EXCLUDED_CONFIG_KEYS = {
-    "DATABASE_URL",      # 数据库连接，防止循环依赖和连接丢失
-    "OPENAI_API_KEY",    # API密钥，安全敏感
-    "TMDB_API_KEY",      # API密钥，安全敏感
-    "SOURCE_DIR",        # 文件系统路径，影响基础功能
-    "TARGET_DIR",        # 文件系统路径，影响基础功能
-    "SQLITE_ECHO",       # 数据库调试选项
-}
+    Returns:
+        Set[str]: 不可配置的配置项集合
+    """
+    try:
+        # 在函数内部导入，避免循环依赖
+        from ...config import get_settings
+        
+        settings = get_settings()
+        return settings.get_config_blacklist()
+        
+    except Exception:
+        # 如果获取失败，返回默认黑名单
+        return {"DATABASE_URL", "ENABLE_TMDB", "ENABLE_LLM"}
 
 
 class ConfigService:
     """配置服务类
     
     提供配置项的数据库操作，包括读取所有配置和安全更新配置。
-    所有写入操作都受到白名单保护和Pydantic验证。
+    所有写入操作都受到动态黑名单保护和Pydantic验证。
     """
     
     @staticmethod
     def read_all_from_db(db: Session) -> Dict[str, Any]:
-        """从数据库读取所有配置项
-        
+        """从数据库读取所有配置项（薄封装）。
+
+        该方法现在复用 ``core.utils.config_loader.load_config_from_session`` 
+        以避免与 ``app.config._db_source`` 的逻辑重复。
+
         Args:
             db: 数据库会话
-            
+
         Returns:
-            包含所有配置项的字典，key为配置名，value为反序列化后的值。
-            如果数据库为空或发生错误，返回空字典{}。
+            Dict[str, Any]: 配置项键值对；读取失败时返回空字典。
         """
         try:
-            # 查询所有配置项
-            statement = select(ConfigItem)
-            config_items = db.exec(statement).all()
-            
-            # 构建配置字典
-            config_dict = {}
-            for item in config_items:
-                try:
-                    # JSON反序列化配置值
-                    config_dict[item.key] = json.loads(item.value)
-                except (json.JSONDecodeError, TypeError):
-                    # 如果反序列化失败，跳过该配置项并记录警告
-                    # 实际应用中可能需要日志记录
-                    continue
-                    
-            return config_dict
-            
+            from ...core.utils.config_loader import load_config_from_session  # 局部导入避免循环依赖
+
+            return load_config_from_session(db)
         except Exception:
-            # 如果发生任何数据库错误，返回空字典确保应用能正常启动
+            # 如出现异常，保证返回空字典，防止调用方因 None 报错
             return {}
     
     @staticmethod
@@ -102,7 +65,7 @@ class ConfigService:
         """更新配置项到数据库
         
         此方法会：
-        1. 过滤：只处理白名单内的配置项
+        1. 过滤：只处理不在动态黑名单中的配置项
         2. 验证：使用Pydantic验证配置的有效性
         3. 事务：在事务内执行，失败时回滚
         
@@ -114,10 +77,13 @@ class ConfigService:
             ValidationError: 当配置验证失败时
             Exception: 当数据库操作失败时
         """
-        # 第一步：过滤 - 只保留白名单内的配置项
+        # 获取当前黑名单
+        blacklist = get_config_blacklist()
+        
+        # 第一步：过滤 - 只保留不在黑名单中的配置项
         filtered_updates = {
             key: value for key, value in updates.items() 
-            if key in WRITABLE_CONFIG_KEYS
+            if key not in blacklist
         }
         
         # 如果没有可更新的配置项，直接返回
@@ -126,11 +92,15 @@ class ConfigService:
         
         try:
             # 第二步：验证 - 获取当前配置并与更新合并，进行Pydantic验证
-            current_config = ConfigService.read_all_from_db(db)
+            # 使用 Settings 内存快照作为当前配置，避免重复查询数据库
+            from ...config import get_settings
+
+            current_config = get_settings().model_dump()
             merged_config = {**current_config, **filtered_updates}
             
             # 创建临时Settings对象进行验证
             # 这将触发所有field_validator，确保配置的有效性
+            from ...config import Settings
             Settings(**merged_config)
             
             # 第三步：写入 - 验证通过后，将过滤后的更新写入数据库
