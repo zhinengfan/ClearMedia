@@ -19,6 +19,7 @@ env*/
 # Environment files
 .env
 .env.*
+!.env.example
 
 # Runtime artifacts
 *.db
