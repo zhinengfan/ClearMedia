@@ -180,7 +180,7 @@ export function RecentActivities() {
               files.map((file) => (
                 <TableRow
                   key={file.id}
-                  className="cursor-pointer hover:bg-gray-50"
+                  className="cursor-pointer hover:bg-green-50"
                   onClick={() => handleRowClick(file.id)}
                 >
                   <TableCell className="font-medium">

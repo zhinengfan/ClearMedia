@@ -26,7 +26,9 @@ export function Dashboard() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-secondary-900 mb-6">Dashboard</h1>
+      <h1 className="text-2xl font-bold text-secondary-900 mb-6 tracking-tight">
+        Dashboard
+      </h1>
 
       {/* 统计卡片 */}
       <StatsCards />

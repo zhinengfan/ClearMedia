@@ -18,34 +18,6 @@ from ...core.schemas import ConfigGetResponse, ConfigUpdateResponse
 config_router = APIRouter(prefix="/api", tags=["config"])
 
 
-def _mask_sensitive_fields(config_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    对敏感字段进行脱敏处理
-    
-    Args:
-        config_dict: 原始配置字典
-        
-    Returns:
-        脱敏后的配置字典
-    """
-    sensitive_fields = {
-        "OPENAI_API_KEY",
-        "TMDB_API_KEY",
-        "DATABASE_URL"
-    }
-    
-    masked_config = config_dict.copy()
-    for field in sensitive_fields:
-        if field in masked_config and masked_config[field]:
-            value = str(masked_config[field])
-            # 保留前3位和后3位，中间用***替换
-            if len(value) > 6:
-                masked_config[field] = value[:3] + "***" + value[-3:]
-            else:
-                masked_config[field] = "***"
-    
-    return masked_config
-
 
 @config_router.get("/config", response_model=ConfigGetResponse)
 def get_config(db: Session = Depends(get_db)) -> ConfigGetResponse:
@@ -68,17 +40,14 @@ def get_config(db: Session = Depends(get_db)) -> ConfigGetResponse:
         # 转换为字典
         config_dict = settings.model_dump()
         
-        # 对敏感字段进行脱敏
-        masked_config = _mask_sensitive_fields(config_dict)
-        
         # 获取配置黑名单列表
         blacklist = get_config_blacklist()
         
         # 返回 Pydantic 响应模型
         return ConfigGetResponse(
-            config=masked_config,
+            config=config_dict,
             blacklist_keys=sorted(blacklist),
-            message="配置获取成功，敏感字段已脱敏"
+            message="配置获取成功"
         )
         
     except Exception as e:
@@ -171,7 +140,7 @@ def update_config(
             logger.warning(f"配置副作用处理失败，但配置更新成功: {e}")
         
         # 返回更新结果
-        updated_config = _mask_sensitive_fields(updated_settings.model_dump())
+        updated_config = updated_settings.model_dump()
         
         return ConfigUpdateResponse(
             message="配置更新成功",

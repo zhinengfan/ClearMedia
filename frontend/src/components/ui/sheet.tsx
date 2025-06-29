@@ -16,10 +16,10 @@ const sheetContentVariants = cva(
   {
     variants: {
       size: {
-        sm: 'w-80',
-        md: 'w-96',
-        lg: 'w-[480px]',
-        xl: 'w-[600px]',
+        sm: 'w-80 max-sm:w-full max-sm:border-l-0',
+        md: 'w-96 max-sm:w-full max-sm:border-l-0',
+        lg: 'w-[480px] max-sm:w-full max-sm:border-l-0',
+        xl: 'w-[600px] max-sm:w-full max-sm:border-l-0',
       },
     },
     defaultVariants: {

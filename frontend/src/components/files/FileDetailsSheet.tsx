@@ -40,7 +40,7 @@ const getStatusIcon = (status: string) => {
       return <CheckCircle className="w-4 h-4 text-green-600" />;
     case 'PROCESSING':
     case 'QUEUED':
-      return <Clock className="w-4 h-4 text-blue-600" />;
+      return <Clock className="w-4 h-4 text-green-600" />;
     case 'FAILED':
     case 'CONFLICT':
     case 'NO_MATCH':
@@ -91,6 +91,9 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
     'closed'
   );
 
+  // Focus trap ref
+  const sheetContentRef = React.useRef<HTMLDivElement>(null);
+
   const isOpen = fileId !== null;
 
   // 管理动画状态
@@ -102,6 +105,70 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
     } else {
       setAnimationState('closed');
     }
+  }, [isOpen]);
+
+  // Focus trap 实现
+  React.useEffect(() => {
+    if (!isOpen || !sheetContentRef.current) return;
+
+    const sheetElement = sheetContentRef.current;
+
+    // 获取所有可聚焦的元素
+    const getFocusableElements = () => {
+      const focusableSelectors = [
+        'button:not([disabled])',
+        'input:not([disabled])',
+        'textarea:not([disabled])',
+        'select:not([disabled])',
+        'a[href]',
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(', ');
+
+      return Array.from(
+        sheetElement.querySelectorAll(focusableSelectors)
+      ) as HTMLElement[];
+    };
+
+    // 设置初始焦点
+    const timer = setTimeout(() => {
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length > 0) {
+        focusableElements[0].focus();
+      }
+    }, 150); // 等待动画完成
+
+    // Tab 键循环处理
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length === 0) return;
+
+      const currentIndex = focusableElements.indexOf(
+        document.activeElement as HTMLElement
+      );
+
+      if (event.shiftKey) {
+        // Shift + Tab: 向前循环
+        const previousIndex =
+          currentIndex === 0 ? focusableElements.length - 1 : currentIndex - 1;
+        focusableElements[previousIndex].focus();
+        event.preventDefault();
+      } else {
+        // Tab: 向后循环
+        const nextIndex =
+          currentIndex === focusableElements.length - 1 ? 0 : currentIndex + 1;
+        focusableElements[nextIndex].focus();
+        event.preventDefault();
+      }
+    };
+
+    sheetElement.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      sheetElement.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isOpen]);
 
   // 获取文件详情
@@ -173,7 +240,10 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetOverlay onClick={onClose} state={animationState} />
       <SheetContent size="lg" onClose={onClose} state={animationState}>
-        <div className="p-6 h-full overflow-auto">
+        <div
+          ref={sheetContentRef}
+          className="p-6 max-sm:p-4 h-full overflow-auto"
+        >
           {/* 标题区域 */}
           <div className="mb-6">
             <h2 className="text-xl font-semibold mb-2">文件详情</h2>
@@ -190,7 +260,7 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
           {/* 加载状态 */}
           {loading && (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
               <span className="ml-2 text-muted-foreground">加载中...</span>
             </div>
           )}
@@ -228,7 +298,7 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
                     <label className="text-sm font-medium text-muted-foreground">
                       文件名
                     </label>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-start gap-2 mt-1">
                       <p className="text-sm font-mono bg-gray-50 p-2 rounded flex-1 break-all">
                         {fileDetail.original_filename}
                       </p>
@@ -236,7 +306,7 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
                         onClick={() =>
                           handleCopy(fileDetail.original_filename, '文件名')
                         }
-                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
                         title="复制文件名"
                       >
                         <Copy className="w-4 h-4" />
@@ -248,7 +318,7 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
                     <label className="text-sm font-medium text-muted-foreground">
                       原始路径
                     </label>
-                    <div className="flex items-center gap-2 mt-1">
+                    <div className="flex items-start gap-2 mt-1">
                       <p className="text-sm font-mono bg-gray-50 p-2 rounded flex-1 break-all">
                         {fileDetail.original_filepath}
                       </p>
@@ -256,7 +326,7 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
                         onClick={() =>
                           handleCopy(fileDetail.original_filepath, '原始路径')
                         }
-                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                        className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
                         title="复制原始路径"
                       >
                         <Copy className="w-4 h-4" />
@@ -264,7 +334,7 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">
                         文件大小
@@ -281,7 +351,7 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">
                         创建时间
@@ -335,7 +405,7 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
                         <label className="text-sm font-medium text-muted-foreground">
                           新文件路径
                         </label>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-start gap-2 mt-1">
                           <p className="text-sm font-mono bg-green-50 p-2 rounded flex-1 break-all">
                             {fileDetail.new_filepath}
                           </p>
@@ -343,7 +413,7 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
                             onClick={() =>
                               handleCopy(fileDetail.new_filepath!, '新文件路径')
                             }
-                            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
                             title="复制新文件路径"
                           >
                             <Copy className="w-4 h-4" />
@@ -407,7 +477,7 @@ export function FileDetailsSheet({ fileId, onClose }: FileDetailsSheetProps) {
                     disabled={retrying}
                     className={cn(
                       'flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
-                      'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed'
+                      'bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed'
                     )}
                   >
                     <RefreshCw

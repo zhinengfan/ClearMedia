@@ -513,8 +513,8 @@ export function DataTable<T extends object>({
                   <TableRow
                     key={index}
                     className={cn(
-                      onRowClick && 'cursor-pointer hover:bg-muted/50',
-                      isSelected && 'bg-muted/50'
+                      onRowClick && 'cursor-pointer hover:bg-green-50',
+                      isSelected && 'bg-green-100'
                     )}
                     onClick={onRowClick ? () => onRowClick(item) : undefined}
                   >
@@ -534,7 +534,11 @@ export function DataTable<T extends object>({
                       </TableCell>
                     )}
                     {columns.map((column) => (
-                      <TableCell key={column.id} className={column.className}>
+                      <TableCell
+                        key={column.id}
+                        className={column.className}
+                        data-label={column.header}
+                      >
                         {renderCell(item, column)}
                       </TableCell>
                     ))}

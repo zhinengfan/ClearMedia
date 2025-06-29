@@ -16,13 +16,20 @@ const badgeVariants = cva(
         destructive:
           'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
         outline: 'text-foreground',
-        // 媒体文件状态相关的颜色
+        // 媒体文件状态相关的颜色 - 使用设计tokens
         completed:
-          'border-transparent bg-green-100 text-green-800 hover:bg-green-100/80',
+          'border-transparent bg-primary-100 text-primary-800 hover:bg-primary-100/80',
+        progress:
+          'border-transparent bg-success-100 text-success-800 hover:bg-success-100/80',
+        pending:
+          'border-transparent bg-warning-100 text-warning-800 hover:bg-warning-100/80',
+        returned:
+          'border-transparent bg-secondary-100 text-secondary-800 hover:bg-secondary-100/80',
+        canceled:
+          'border-transparent bg-danger-100 text-danger-800 hover:bg-danger-100/80',
+        // 保留原有变体以保持兼容性
         processing:
           'border-transparent bg-blue-100 text-blue-800 hover:bg-blue-100/80',
-        pending:
-          'border-transparent bg-yellow-100 text-yellow-800 hover:bg-yellow-100/80',
         failed:
           'border-transparent bg-red-100 text-red-800 hover:bg-red-100/80',
         conflict:

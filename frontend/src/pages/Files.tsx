@@ -5,6 +5,7 @@ import { Toast } from '../lib/toast';
 import { DataTable, type ColumnDef } from '../components/ui/DataTable';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
+
 import { StatusFilter } from '../components/files/StatusFilter';
 import { BatchActions } from '../components/files/BatchActions';
 import { useDebounce } from '../hooks/useDebounce';
@@ -370,7 +371,7 @@ export function Files() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">媒体文件管理</h1>
+        <h1 className="text-2xl font-bold tracking-tight">媒体文件管理</h1>
         <p className="text-muted-foreground">管理和查看您的媒体文件处理状态</p>
       </div>
 
@@ -499,27 +500,13 @@ export function Files() {
         onSelectedRecordsChange={setSelectedFiles}
         getRecordId={(record) => String(record.id)}
         isRecordSelectable={isFileSelectable}
-        emptyContent={
-          <div className="text-center py-12">
-            <p className="text-muted-foreground text-lg">暂无媒体文件</p>
-            <p className="text-muted-foreground text-sm mt-2">
-              上传媒体文件后将在此处显示
-            </p>
-          </div>
-        }
       />
 
-      {/* 文件详情面板 */}
+      {/* 详情面板 */}
       <FileDetailsSheet
-        fileId={search.details || null}
+        fileId={search.details ?? null}
         onClose={handleDetailsClose}
       />
-
-      {!loading && !error && (
-        <div className="text-sm text-muted-foreground">
-          共找到 {total} 个文件
-        </div>
-      )}
     </div>
   );
 }

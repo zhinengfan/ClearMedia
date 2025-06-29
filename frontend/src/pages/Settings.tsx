@@ -110,7 +110,9 @@ export function Settings() {
     'OpenAI/LLM': Object.keys(config).filter(
       (key) => key.startsWith('OPENAI_') || key.includes('LLM')
     ),
-    TMDB: Object.keys(config).filter((key) => key.startsWith('TMDB_')),
+    TMDB: Object.keys(config).filter(
+      (key) => key.startsWith('TMDB_') || key === 'ENABLE_TMDB'
+    ),
     扫描与文件: Object.keys(config).filter(
       (key) =>
         key.includes('SCAN_') ||
@@ -126,12 +128,12 @@ export function Settings() {
         key.includes('PRODUCER_') ||
         key.includes('CORS_')
     ),
-    功能开关: Object.keys(config).filter((key) => key.startsWith('ENABLE_')),
     其他: Object.keys(config).filter((key) => {
       const groups = [
         'OPENAI_',
         'LLM',
         'TMDB_',
+        'ENABLE_TMDB',
         'SCAN_',
         'FILE',
         'DIR',
@@ -141,7 +143,6 @@ export function Settings() {
         'WORKER_',
         'PRODUCER_',
         'CORS_',
-        'ENABLE_',
       ];
       return !groups.some((prefix) => key.includes(prefix));
     }),
@@ -151,7 +152,7 @@ export function Settings() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">系统设置</h1>
+          <h1 className="text-2xl font-bold tracking-tight">系统设置</h1>
           <p className="text-muted-foreground">
             配置系统参数，不在黑名单内的配置项可以修改
           </p>

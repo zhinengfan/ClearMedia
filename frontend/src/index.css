@@ -70,6 +70,13 @@
   --color-danger-900: #7f1d1d;
   --color-danger-950: #450a0a;
 
+  /* Status color mappings for Badge variants */
+  --color-status-pending: var(--color-warning-500);
+  --color-status-progress: var(--color-success-500);
+  --color-status-completed: var(--color-primary-500);
+  --color-status-returned: var(--color-secondary-500);
+  --color-status-canceled: var(--color-danger-500);
+
   /* Font families */
   --font-family-sans: 'Inter', system-ui, sans-serif;
   --font-family-mono: 'JetBrains Mono', monospace;
@@ -77,11 +84,18 @@
   /* Custom spacing */
   --spacing-18: 4.5rem;
   --spacing-88: 22rem;
+  --spacing-card: 1.5rem; /* 24px padding for card content */
 
   /* Custom border radius */
   --border-radius-xl: 0.75rem;
   --border-radius-2xl: 1rem;
   --border-radius-3xl: 1.5rem;
+
+  /* Card and component styles */
+  --color-card-bg: #ffffff;
+  --color-card-border: var(--color-secondary-200);
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
 /* Custom base styles */
@@ -271,5 +285,60 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Mobile responsive table styles */
+@media (max-width: 767px) {
+  /* Hide table headers on mobile */
+  table thead {
+    @apply sr-only;
+  }
+
+  /* Style table rows as cards */
+  table tbody tr {
+    @apply block bg-white rounded-lg shadow-sm border border-gray-200 mb-4 p-4;
+  }
+
+  /* Style table cells as stacked items */
+  table tbody td {
+    @apply block text-left py-2 px-0 border-0;
+    
+    /* Show data-label before cell content */
+    &:before {
+      content: attr(data-label) ": ";
+      @apply font-medium text-gray-700 inline-block min-w-[80px] mr-2;
+    }
+
+    /* First cell (usually ID) gets special treatment */
+    &:first-child {
+      @apply font-semibold text-gray-900 border-b border-gray-100 pb-3 mb-3;
+    }
+
+    /* Last cell removes bottom margin */
+    &:last-child {
+      @apply mb-0;
+    }
+  }
+
+  /* Checkbox cells get special styling */
+  table tbody td:has(input[type="checkbox"]) {
+    @apply flex items-center justify-between py-3;
+    
+    &:before {
+      content: "选择";
+      @apply font-medium text-gray-700;
+    }
+  }
+
+  /* Remove default table layout */
+  table, 
+  table tbody {
+    @apply block;
+  }
+
+  /* Adjust padding for table container */
+  .rounded-md.border {
+    @apply border-0 bg-transparent;
   }
 }

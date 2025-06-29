@@ -79,13 +79,79 @@ export function StatsCards() {
     fetchStats();
   }, []);
 
+  // 点击事件处理函数
+  const handleCompletedClick = () => {
+    navigate({
+      to: '/media',
+      search: {
+        skip: 0,
+        limit: 20,
+        status: 'COMPLETED',
+        search: '',
+        sort: 'created_at:desc',
+      },
+    });
+  };
+
+  const handleProcessingClick = () => {
+    navigate({
+      to: '/media',
+      search: {
+        skip: 0,
+        limit: 20,
+        status: 'PROCESSING',
+        search: '',
+        sort: 'created_at:desc',
+      },
+    });
+  };
+
   const handlePendingClick = () => {
     navigate({
       to: '/media',
       search: {
         skip: 0,
         limit: 20,
-        status: 'pending',
+        status: 'PENDING,QUEUED',
+        search: '',
+        sort: 'created_at:desc',
+      },
+    });
+  };
+
+  const handleConflictClick = () => {
+    navigate({
+      to: '/media',
+      search: {
+        skip: 0,
+        limit: 20,
+        status: 'CONFLICT',
+        search: '',
+        sort: 'created_at:desc',
+      },
+    });
+  };
+
+  const handleFailedClick = () => {
+    navigate({
+      to: '/media',
+      search: {
+        skip: 0,
+        limit: 20,
+        status: 'FAILED',
+        search: '',
+        sort: 'created_at:desc',
+      },
+    });
+  };
+
+  const handleNoMatchClick = () => {
+    navigate({
+      to: '/media',
+      search: {
+        skip: 0,
+        limit: 20,
+        status: 'NO_MATCH',
         search: '',
         sort: 'created_at:desc',
       },
@@ -96,18 +162,20 @@ export function StatsCards() {
     {
       title: '已完成',
       value: stats.completed,
-      className: 'bg-green-50 border-green-200 hover:bg-green-100',
+      className:
+        'bg-green-50 border-green-200 hover:bg-green-100 cursor-pointer transition-colors',
       titleClassName: 'text-green-800',
       valueClassName: 'text-green-600',
-      onClick: undefined,
+      onClick: handleCompletedClick,
     },
     {
       title: '处理中',
       value: stats.processing,
-      className: 'bg-blue-50 border-blue-200 hover:bg-blue-100',
+      className:
+        'bg-blue-50 border-blue-200 hover:bg-blue-100 cursor-pointer transition-colors',
       titleClassName: 'text-blue-800',
       valueClassName: 'text-blue-600',
-      onClick: undefined,
+      onClick: handleProcessingClick,
     },
     {
       title: '待处理',
@@ -121,26 +189,29 @@ export function StatsCards() {
     {
       title: '冲突',
       value: stats.conflict,
-      className: 'bg-orange-50 border-orange-200 hover:bg-orange-100',
+      className:
+        'bg-orange-50 border-orange-200 hover:bg-orange-100 cursor-pointer transition-colors',
       titleClassName: 'text-orange-800',
       valueClassName: 'text-orange-600',
-      onClick: undefined,
+      onClick: handleConflictClick,
     },
     {
       title: '失败',
       value: stats.failed,
-      className: 'bg-red-50 border-red-200 hover:bg-red-100',
+      className:
+        'bg-red-50 border-red-200 hover:bg-red-100 cursor-pointer transition-colors',
       titleClassName: 'text-red-800',
       valueClassName: 'text-red-600',
-      onClick: undefined,
+      onClick: handleFailedClick,
     },
     {
       title: '未匹配',
       value: stats.noMatch,
-      className: 'bg-purple-50 border-purple-200 hover:bg-purple-100',
+      className:
+        'bg-purple-50 border-purple-200 hover:bg-purple-100 cursor-pointer transition-colors',
       titleClassName: 'text-purple-800',
       valueClassName: 'text-purple-600',
-      onClick: undefined,
+      onClick: handleNoMatchClick,
     },
     {
       title: '总计',
