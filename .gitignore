@@ -44,4 +44,4 @@ frontend/dist/
 frontend/build/
 
 .coverage
-.cursor/
+.cursor/*
