@@ -15,4 +15,15 @@ services:
       # 数据库目录挂载
       - ./data:/data/db
     restart: unless-stopped
-    container_name: clearmedia-backend 
+    container_name: clearmedia-backend
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+    container_name: clearmedia-frontend 
