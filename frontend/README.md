@@ -1,86 +1,78 @@
-# ClearMedia 前端开发指南
+# ClearMedia 前端
 
-本仓库的 `frontend` 子项目基于 **React 19 + TypeScript + Vite** 搭建，使用 **Tailwind CSS 4** 进行样式开发。
+本文档涵盖了 ClearMedia 前端的设置、架构和开发流程。这是一个使用 **React 19、TypeScript 和 Vite** 构建的现代化 Web 应用。
 
-> 项目使用 **pnpm** 作为包管理工具，并依赖 **Monorepo workspace**（根目录 `package.json` 的 `workspaces` 字段）。
+## 核心功能
 
-## 环境要求
+-   **仪表盘**: 媒体处理统计和近期活动的概览。
+-   **文件管理**: 一个综合表格，用于查看、搜索、筛选和排序所有媒体文件。
+-   **详情视图**: 一个可滑出的面板，用于检查任何单个文件的详细信息。
+-   **批量操作**: 一次性重试或管理多个失败的文件。
+-   **动态设置**: 一个用户友好的界面，用于实时查看和更新后端配置。
 
-- Node.js ≥ 20.x
-- pnpm ≥ 10.x（推荐通过 `corepack enable` 启用）
-- Git（用于 Husky 提交钩子）
+## 技术栈
 
-## 快速开始
+-   **框架**: React 19
+-   **语言**: TypeScript
+-   **构建工具**: Vite
+-   **样式**: Tailwind CSS & shadcn/ui
+-   **路由**: TanStack Router
+-   **数据获取**: 使用 `fetch` 的自定义 Hooks
+-   **代码质量**: ESLint, Prettier, 和 Husky
 
-1. **安装依赖**（在项目根目录执行，确保安装 workspace 依赖）
+## 目录结构
 
-   ```bash
-   pnpm install
-   ```
+`src` 目录按功能和职责进行组织：
 
-2. **启动开发服务器**
+```
+frontend/src/
+├── components/   # 可复用 UI 组件 (例如, DataTable, Sidebar)
+├── hooks/        # 自定义 Hooks (例如, useConfig, useDebounce)
+├── lib/          # 核心工具 (例如, api.ts, toast.ts)
+├── pages/        # 顶层页面组件 (Dashboard, Files, Settings)
+├── router.tsx    # 应用路由配置
+└── main.tsx      # 应用主入口点
+```
 
-   ```bash
-   # 启动后端（另一个终端中执行）
-   uv run uvicorn main:app --app-dir backend --host 0.0.0.0 --port 8000  --reload
+## 本地开发
 
-   # 启动前端
-   pnpm dev            # 等价于 pnpm --filter frontend dev
-   ```
+### 先决条件
 
-   前端将通过 Vite 启动，默认监听 `http://localhost:5173`。如需修改端口请参见 `vite.config.ts`。
+-   Node.js >= 20
+-   pnpm >= 10
 
-3. **构建生产包**
+### 设置
 
-   ```bash
-   pnpm build          # 等价于 pnpm --filter frontend build
-   ```
+1.  **安装依赖**:
+    在项目根目录运行：
+    ```bash
+    pnpm install
+    ```
 
-4. **预览生产包**
+2.  **配置环境**:
+    Vite 开发服务器已配置为将所有从 `/api` 发出的请求代理到运行在 `http://localhost:8000` 的后端服务器。此配置在 `vite.config.ts` 中处理，无需额外的环境配置。
 
-   ```bash
-   pnpm preview        # 本地预览 dist
-   ```
+3.  **运行服务**:
+    您需要同时运行后端和前端服务器。
+
+    -   **启动后端**:
+        在一个终端中，从项目根目录运行：
+        ```bash
+        uv run uvicorn main:app --app-dir backend --reload --port 8000
+        ```
+
+    -   **启动前端**:
+        在另一个终端中，从项目根目录运行：
+        ```bash
+        pnpm -F frontend dev
+        ```
+
+    前端应用将在 `http://localhost:5173` 上可用。
 
 ## 代码质量
 
-本项目启用了 **ESLint**、**Prettier** 与 **Husky + lint-staged**，在提交前会自动执行格式化与 Lint 校验。
+项目配备了工具来保持高代码质量。
 
-| 命令             | 说明                                  |
-| ---------------- | ------------------------------------- |
-| `pnpm lint`      | 运行 ESLint 检查                      |
-| `pnpm lint:fix`  | 自动修复可修复的 Lint 问题            |
-| `pnpm format`    | 使用 Prettier 对代码进行格式化        |
-| `pnpm format:check` | 检查格式化（只读，不写入）           |
-| `pnpm prepare`   | 初始化 Husky Git 钩子（install 时自动）|
-
-> 安装依赖后将自动执行 `pnpm prepare` 并在 `.husky/` 目录写入 Git 钩子，需要保证本机 Git 已开启执行权限。
-
-## 目录结构概览
-
-```
-frontend/
-├── src/              # 业务源码
-│   ├── components/   # 通用 UI 组件
-│   ├── hooks/        # 通用 Hook
-│   ├── pages/        # 路由页面
-│   ├── router.tsx    # 路由配置（@tanstack/react-router）
-│   └── main.tsx      # 入口文件
-├── public/           # 公共静态资源
-├── tailwind.config.ts
-├── vite.config.ts
-└── package.json
-```
-
-## 与后端联调
-
-默认情况下，前端通过环境变量或在 `.env` 文件中配置的 `VITE_API_BASE_URL` 访问后端接口。
-
-```bash
-# frontend/.env
-VITE_API_BASE_URL=http://localhost:8000/api
-```
-
-在开发模式下，Vite 会自动将前缀为 `/api` 的请求代理到该后端地址，详见 `vite.config.ts` 中的 `proxy` 设置。
-
-
+-   `pnpm lint`: 运行 ESLint 检查代码问题。
+-   `pnpm format`: 使用 Prettier 格式化所有文件。
+-   **Husky Git Hooks**: 在每次提交之前，`lint-staged` 会自动格式化并检查暂存文件。

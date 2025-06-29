@@ -1,198 +1,131 @@
-# ClearMedia 后端服务
+# ClearMedia 后端
 
-这是 ClearMedia 项目的后端服务。
+本文档为 ClearMedia 的后端服务提供了一份全面的指南。该后端服务基于 FastAPI 构建，是一个用于扫描、处理和组织媒体文件的强大工具。
+
+## 核心功能
+
+-   **自动化媒体扫描**: 定期扫描源目录以发现新的媒体文件。
+-   **丰富的元数据增强**: 从 TMDB 获取元数据，并使用 LLM 进行高级分析。
+-   **智能文件整理**: 将文件重命名并整理到干净、结构化的目标目录中。
+-   **动态配置**: 允许通过 REST API 进行实时配置更新，无需重启服务。
+-   **强大的 API**: 提供用于查询文件、查看统计、重试失败任务和管理设置的端点。
 
 ## 架构概览
 
-### 媒体处理服务架构
+后端采用模块化和可扩展的架构设计，围绕一个健壮的媒体处理管线构建。
 
-媒体处理服务采用模块化设计，按职责拆分为以下子模块：
+### 媒体处理工作流
+
+处理服务由几个协同工作的专门模块组成：
 
 ```
 backend/app/services/media/
-├── __init__.py           # 模块导出和向后兼容
-├── types.py              # 数据结构和类型定义 (~9行)
-├── path_generator.py     # 路径生成逻辑 (~85行)
-├── status_manager.py     # 状态管理 (~178行)
-├── processor.py          # 主处理协调器 (~193行)
-└── scanner.py            # 文件扫描功能 (~214行)
+├── scanner.py        # 扫描源目录以发现新文件
+├── producer.py       # 将新文件添加到处理队列
+├── processor.py      # 编排主要处理逻辑
+├── status_manager.py # 管理每个媒体文件的状态
+├── path_generator.py # 为文件生成最终目标路径
+└── types.py          # 定义共享的数据结构
 ```
 
-#### 模块职责
+**工作流步骤:**
 
-- **types.py**: 定义 `ProcessResult` 等数据结构
-- **path_generator.py**: 根据媒体信息生成标准的目标路径，包含标题清理逻辑
-- **status_manager.py**: 原子性地更新媒体文件状态和相关字段
-- **processor.py**: 处理流程协调器，编排 LLM分析 → TMDB匹配 → 文件链接 → 状态更新
-- **scanner.py**: 扫描源目录，发现新的媒体文件并添加到数据库
+1.  **扫描 (Scanning)**: `scanner` 模块识别 `media_source` 目录中的新文件。
+2.  **入队 (Queuing)**: `producer` 模块将发现的文件以 `PENDING` (待处理) 状态添加到数据库。
+3.  **处理 (Processing)**: `processor` 模块获取待处理的文件并执行核心逻辑：
+    -   从 **TMDB** 获取元数据。
+    -   (可选) 使用 **LLM** 进行更深入的分析。
+    -   使用 `path_generator` 生成一个新的、干净的文件名和路径。
+    -   在 `media_target` 目录中创建一个符号链接。
+4.  **状态更新**: `status_manager` 确保在每一步都原子地更新文件的状态 (`PROCESSING`, `COMPLETED`, `FAILED` 等)。
 
-#### 设计优势
+### 设计优势
 
-1. **单一职责**: 每个模块专注于特定功能，便于维护和测试
-2. **可测试性**: 独立的模块更容易编写单元测试
-3. **可复用性**: 其他地方可以重用路径生成或状态管理功能
-4. **符合规范**: 每个文件都在200行以内，符合项目编码规范
+-   **单一职责**: 每个模块都有明确定义的用途，简化了维护和测试。
+-   **逻辑解耦**: 基于队列的方法将文件发现与处理解耦，提高了系统的弹性。
+-   **可测试性**: 独立的模块易于进行单元测试。
 
-## Docker 部署指南
+## API 文档
 
-本指南将说明如何使用 Docker 和 Docker Compose 部署后端服务。
+API 提供了对媒体库和系统配置的完全控制。
 
-### 前提条件
+> **基础 URL**: `http://<host>:8000/api`
+> **交互式文档**:
+> - **Swagger UI**: `http://<host>:8000/docs`
+> - **ReDoc**: `http://<host>:8000/redoc`
 
-1.  **Docker 与 Docker Compose**: 请确保您的系统中已安装这两个工具。
-2.  **环境变量**: 复制环境变量示例文件，并根据您的环境进行配置。
+---
 
+### 媒体端点 (`/files`)
+
+#### `GET /api/files`
+
+获取媒体文件的分页列表，支持筛选、搜索和排序。
+
+| 参数 | 类型 | 默认值 | 描述 |
+| :--- | :--- | :--- | :--- |
+| `skip` | `int` | `0` | 分页偏移量。 |
+| `limit` | `int` | `20` | 返回的项目数 (1-500)。 |
+| `status` | `string` | (可选) | 按状态筛选 (例如, `COMPLETED`, `FAILED`)。支持多个值，用逗号分隔。 |
+| `search` | `string` | (可选) | 按文件名进行关键字搜索。 |
+| `sort` | `string` | `created_at:desc` | 排序顺序 (例如, `updated_at:asc`)。 |
+
+#### `GET /api/files/{file_id}`
+
+按 ID 获取单个媒体文件的详细信息。
+
+#### `POST /api/files/{file_id}/retry`
+
+重试处于 `FAILED`、`NO_MATCH` 或 `CONFLICT` 状态的文件，方法是将其状态重置为 `PENDING`。
+
+#### `POST /api/files/batch-retry`
+
+批量重试一组文件。
+
+-   **请求体**: `{ "file_ids": [1, 2, 3] }`
+
+#### `POST /api/files/batch-delete`
+
+批量删除文件的数据库记录 (不会删除磁盘上的实际文件)。
+
+-   **请求体**: `{ "file_ids": [1, 2, 3] }`
+
+#### `GET /api/files/suggest`
+
+根据关键字为自动完成功能提供文件名建议。
+
+---
+
+### 统计端点 (`/stats`)
+
+#### `GET /api/stats`
+
+返回按状态分组的媒体文件摘要 (例如, `{ "COMPLETED": 120, "FAILED": 5 }`)。
+
+---
+
+### 配置端点 (`/config`)
+
+#### `GET /api/config`
+
+获取当前系统配置。敏感密钥 (如 API 密钥) 会被隐去。
+
+#### `POST /api/config`
+
+更新一个或多个配置值并触发热重载。只有非黑名单中的密钥可以被修改。
+
+-   **请求体**: `{ "LOG_LEVEL": "INFO", "TMDB_CONCURRENCY": 8 }`
+
+## 本地开发
+
+1.  **安装依赖**:
     ```bash
-    # 首先，复制 .env.example 文件为 .env
-    cp .env.example .env
-    # 然后，编辑 .env 文件，填入您的特定配置。
-    # 请特别注意媒体库路径和 API 密钥等设置。
+    # 确保您位于项目根目录
+    pnpm install
     ```
 
-### 运行服务
-
-1.  **构建 Docker 镜像**
-
-    使用 Docker Compose 构建服务镜像。请在项目根目录下执行此命令。
-
+2.  **运行服务**:
+    使用 `uv` 运行开发服务器，它支持热重载并能读取 `.env` 文件。
     ```bash
-    docker compose build
+    uv run uvicorn main:app --app-dir backend --reload --port 8000
     ```
-
-2.  **启动容器**
-
-    以分离模式 (`-d`) 运行容器。
-
-    ```bash
-    docker compose up -d
-    ```
-
-3.  **检查状态**
-
-    您可以使用以下命令验证容器是否正在运行：
-
-    ```bash
-    docker compose ps
-    ```
-
-### 查看日志
-
-要查看后端服务的实时日志：
-
-```bash
-docker compose logs -f
-```
-
-### 常见问题 (FAQ)
-
--   **端口 8000 已被占用**:
-    如果您看到关于端口 8000 被占用的错误消息，说明您机器上的另一个服务正在使用它。您可以停止该服务，或者在 `docker-compose.yml` 文件中更改端口映射。例如，将 `"8000:8000"` 修改为 `"8001:8000"`，以将其映射到主机的 8001 端口。
-
--   **挂载卷权限不足**:
-    如果容器无法读取或写入 `media_source` 或 `media_target` 目录，这很可能是宿主机上的文件权限问题。请确保运行 Docker 容器的用户拥有必要的权限。在 Linux 系统上，您可能需要使用 `chown` 或 `chmod` 命令来调整目录所有权或权限。
-
-### API 使用说明
-
-> 所有接口默认根路径为 `http://<host>:8000/api`。
-> 在容器环境中可将 `<host>` 替换为宿主机地址或 `localhost`（端口可能已映射）。
-
-#### 1. GET `/files`
-查询媒体文件列表，支持分页、状态过滤、文件名模糊搜索与排序。
-
-| 参数         | 类型                                   | 默认值            | 说明                                                                                                  |
-|--------------|----------------------------------------|-------------------|-------------------------------------------------------------------------------------------------------|
-| `skip`       | int (>=0)                              | `0`               | 跳过的记录数（分页起始偏移量）                                                                         |
-| `limit`      | int (1~500)                            | `20`              | 返回记录数限制                                                                                        |
-| `status`     | string                                 | *(可选)*          | 按状态筛选，可选值: `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`, `CONFLICT`, `NO_MATCH`            |
-| `search`     | string                                 | *(可选)*          | 文件名模糊搜索关键字                                                                                  |
-| `sort`       | enum                                   | `created_at:desc` | 排序方式，可选 `created_at:asc` 或 `created_at:desc`                                                  |
-
-**示例**
-```bash
-curl -G 'http://localhost:8000/api/files' \
-     --data-urlencode 'limit=50' \
-     --data-urlencode 'status=COMPLETED' \
-     --data-urlencode 'sort=created_at:asc'
-```
-
----
-
-#### 2. GET `/files/suggest`
-根据文件名前缀提供自动补全建议。
-
-| 参数     | 类型            | 默认值   | 说明                                      |
-|----------|-----------------|----------|-------------------------------------------|
-| `keyword`| string (必填)   | —        | 文件名前缀关键字                          |
-| `limit`  | int (1~100)     | `20`     | 返回建议数量限制                          |
-
-**示例**
-```bash
-curl -G 'http://localhost:8000/api/files/suggest' --data-urlencode 'keyword=movie'
-```
-
----
-
-#### 3. GET `/files/{file_id}`
-根据文件 ID 获取媒体文件详情。
-
-**示例**
-```bash
-curl 'http://localhost:8000/api/files/123'
-```
-
----
-
-#### 4. GET `/stats`
-获取按状态分组的媒体文件数量统计。
-
-**示例**
-```bash
-curl 'http://localhost:8000/api/stats'
-```
-
----
-
-#### 5. POST `/files/{file_id}/retry`
-对 `FAILED` / `NO_MATCH` / `CONFLICT` 状态的媒体文件重新排队处理。
-
-**示例**
-```bash
-curl -X POST 'http://localhost:8000/api/files/123/retry'
-```
-
-> 若重试成功，接口将返回当前状态已更新为 `PENDING` 的确认信息。
-
----
-
-#### 6. GET `/config`
-获取当前系统配置（敏感字段已脱敏）。
-
-**示例**
-```bash
-curl 'http://localhost:8000/api/config'
-```
-
----
-
-#### 7. POST `/config`
-批量更新系统配置并触发热重载，仅支持白名单字段。
-
-**示例**
-```bash
-curl -X POST 'http://localhost:8000/api/config' \
-     -H 'Content-Type: application/json' \
-     -d '{"LOG_LEVEL": "INFO", "TMDB_CONCURRENCY": 8}'
-```
-
----
-
-### 查看 Swagger UI / ReDoc
-
-构建并运行容器后，打开以下地址获取 OpenAPI 文档：
-
-- Swagger UI: `http://<host>:8000/docs`
-- ReDoc: `http://<host>:8000/redoc`
-
-如文档与实际接口不一致，请先检查依赖任务是否已合并并重新构建镜像。
-
-
