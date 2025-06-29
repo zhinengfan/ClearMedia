@@ -44,4 +44,8 @@ frontend/dist/
 frontend/build/
 
 .coverage
+
+# IDE 和开发工具文件夹
+.cursor/
 .cursor/*
+.husky/
